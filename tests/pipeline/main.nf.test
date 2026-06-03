@@ -1,0 +1,30 @@
+nextflow_pipeline {
+
+    name "Phase 1 end-to-end: samplesheet -> harmonised hub"
+    script "main.nf"
+
+    test("test profile produces one harmonised file") {
+        when {
+            params {
+                // Generate a samplesheet whose sumstats path is absolute (projectDir-
+                // anchored) so nf-schema's file-path check resolves it regardless of
+                // the nf-test launch directory.
+                def sheet = new File("${outputDir}/samplesheet.csv")
+                sheet.parentFile.mkdirs()
+                sheet.text = "id,sumstats,format,n,ancestry,trait,pop_prev,build\n" +
+                             "demo,${projectDir}/assets/test/gwas_ssf_demo.tsv,gwas-ssf,10000,EUR,Demo trait,,GRCh37\n"
+
+                input        = sheet.toString()
+                ld_ref_dir   = "${projectDir}/assets/test"
+                outdir       = "${outputDir}"
+                genome_build = "GRCh37"
+                modules      = ""
+            }
+        }
+        then {
+            assert workflow.success
+            // harmonise publishDir contains the demo hub file
+            assert path("${outputDir}/harmonise/demo.harmonised.tsv.gz").exists()
+        }
+    }
+}
