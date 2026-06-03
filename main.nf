@@ -1,9 +1,9 @@
 #!/usr/bin/env nextflow
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    bernooi/sumstats_pipeline
+    bernooi/draft_sumstats
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Github : https://github.com/bernooi/sumstats_pipeline
+    Github : https://github.com/bernooi/draft_sumstats
 ----------------------------------------------------------------------------------------
 */
 
@@ -14,8 +14,8 @@
 */
 
 include { SUMSTATS  } from './workflows/sumstats'
-include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_sumstats_pipeline'
-include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_sumstats_pipeline'
+include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_draft_sumstats'
+include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_draft_sumstats'
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     NAMED WORKFLOWS FOR PIPELINE
