@@ -1,0 +1,64 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/bernooi/sumstats_pipeline/master/assets/schema_input.json",
+    "title": "bernooi/sumstats_pipeline pipeline - params.input schema",
+    "description": "Schema for the samplesheet provided with params.input",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "id": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "Sample/trait id is required and must not contain spaces",
+                "meta": ["id"]
+            },
+            "sumstats": {
+                "type": "string",
+                "format": "file-path",
+                "exists": true,
+                "pattern": "^\\S+\\.(tsv|txt|out|tsv\\.gz|txt\\.gz)$",
+                "errorMessage": "Sumstats must be a path to a .tsv/.txt/.out or gzipped variant"
+            },
+            "format": {
+                "type": "string",
+                "enum": ["gwas-ssf", "gwama", "hail", "cvdkp"],
+                "default": "gwas-ssf",
+                "errorMessage": "Format must be one of: gwas-ssf, gwama, hail, cvdkp",
+                "meta": ["format"]
+            },
+            "n": {
+                "type": "integer",
+                "minimum": 1,
+                "errorMessage": "Sample size (n) must be a positive integer",
+                "meta": ["n"]
+            },
+            "ancestry": {
+                "type": "string",
+                "enum": ["EUR", "EAS", "SAS", "AFR", "AMR", "MIX"],
+                "errorMessage": "Ancestry must be one of: EUR, EAS, SAS, AFR, AMR, MIX",
+                "meta": ["ancestry"]
+            },
+            "trait": {
+                "type": "string",
+                "pattern": "^\\S.*$",
+                "errorMessage": "Trait label must be provided",
+                "meta": ["trait"]
+            },
+            "pop_prev": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "errorMessage": "Population prevalence (pop_prev) must be a number between 0 and 1; leave blank for quantitative traits",
+                "meta": ["pop_prev"]
+            },
+            "build": {
+                "type": "string",
+                "enum": ["GRCh37", "GRCh38"],
+                "errorMessage": "build must be GRCh37 or GRCh38; leave blank to inherit --genome_build",
+                "meta": ["build"]
+            }
+        },
+        "required": ["id", "sumstats", "format", "n", "ancestry", "trait"]
+    }
+}
