@@ -1,0 +1,35 @@
+nextflow_process {
+
+    name "Test HARMONISE_GWAS_SSF"
+    script "modules/local/harmonise_gwas_ssf.nf"
+    process "HARMONISE_GWAS_SSF"
+
+    test("gwas-ssf demo harmonises to the hub columns") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'demo', format:'gwas-ssf', n:10000, ancestry:'EUR', trait:'Demo', build:'GRCh37' ],
+                    file("${projectDir}/assets/test/gwas_ssf_demo.tsv")
+                ]
+                input[1] = file("${projectDir}/assets/test/snp.info")
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out.harmonised[0][1]).linesGzip
+            // canonical hub header
+            assert lines[0] == "rsid\tchr\tpos\tea\toa\teaf\tbeta\tse\tp\tn\tz"
+            // rs7 is absent from snp.info -> dropped on join (8 input -> 7 data rows).
+            // Match rs followed by a digit so the "rsid" header line is excluded.
+            def data = lines.findAll { it ==~ /^rs\d.*/ }
+            assert data.size() == 7
+            // rs3 flip: ea stays ref A1=G, beta sign flipped to negative
+            def rs3 = data.find { it.startsWith("rs3\t") }.split("\t")
+            assert rs3[3] == "G"            // ea == ref A1
+            assert rs3[4] == "A"            // oa == ref A2
+            assert (rs3[6] as double) < 0   // beta flipped negative
+        }
+    }
+}
