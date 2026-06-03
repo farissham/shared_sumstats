@@ -1,0 +1,14 @@
+# Nextflow run artifacts
+.nextflow*
+work/
+results/
+null/
+*.log
+nf-*-reports.tsv
+
+# LD reference download cache (imputed_7m profile)
+ld_ref_cache/
+
+# OS / editor
+.DS_Store
+*.swp
