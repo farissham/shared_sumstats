@@ -1,0 +1,26 @@
+nextflow_workflow {
+
+    name "Test HARMONISE subworkflow"
+    script "subworkflows/local/harmonise/main.nf"
+    workflow "HARMONISE"
+
+    test("routes gwas-ssf to the hub") {
+        when {
+            workflow {
+                """
+                input[0] = Channel.of([
+                    [ id:'demo', format:'gwas-ssf', n:10000, ancestry:'EUR', trait:'Demo', build:'GRCh37' ],
+                    file("${projectDir}/assets/test/gwas_ssf_demo.tsv")
+                ])
+                input[1] = file("${projectDir}/assets/test/snp.info")
+                """
+            }
+        }
+        then {
+            assert workflow.success
+            assert workflow.out.harmonised.size() == 1
+            def lines = path(workflow.out.harmonised[0][1]).linesGzip
+            assert lines[0] == "rsid\tchr\tpos\tea\toa\teaf\tbeta\tse\tp\tn\tz"
+        }
+    }
+}
