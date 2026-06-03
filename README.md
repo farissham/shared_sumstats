@@ -31,3 +31,20 @@ Every input format is normalised to one canonical artifact,
 
 rsID is the canonical join key; `chr`/`pos` are attached from the LD reference
 `snp.info` (record-only build, see the design spec).
+
+## Monitoring with Seqera Platform (Tower)
+
+Live run monitoring is **opt-in** and activates automatically when a
+`TOWER_ACCESS_TOKEN` is present in the environment — no config edits, no token
+in git. Create a token at <https://cloud.seqera.io> (avatar → *Access tokens*),
+then:
+
+```bash
+export TOWER_ACCESS_TOKEN=<your-token>
+# export TOWER_WORKSPACE_ID=<id>   # optional: stream into a shared workspace
+nextflow run . -profile test,docker --outdir results
+```
+
+Without `TOWER_ACCESS_TOKEN` set, runs behave exactly as before. Prefer not to
+keep the token in your shell? Use Nextflow secrets instead:
+`nextflow secrets set TOWER_ACCESS_TOKEN <token>`. Never commit the token.
