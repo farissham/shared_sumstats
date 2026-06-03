@@ -6,6 +6,9 @@ null/
 *.log
 nf-*-reports.tsv
 
+# nf-test working dir
+.nf-test/
+
 # LD reference download cache (imputed_7m profile)
 ld_ref_cache/
 
