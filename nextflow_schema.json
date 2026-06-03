@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://raw.githubusercontent.com/bernooi/draft_sumstats/master/nextflow_schema.json",
-    "title": "bernooi/draft_sumstats pipeline parameters",
+    "$id": "https://raw.githubusercontent.com/bernooi/shared_sumstats/master/nextflow_schema.json",
+    "title": "bernooi/shared_sumstats pipeline parameters",
     "description": "nf-core-style pipeline for descriptive analysis of GWAS summary statistics",
     "type": "object",
     "$defs": {

@@ -299,19 +299,19 @@ git -C "$DEST" commit -m "feat: port schema_input.json; add optional build colum
 ### Task 6: Port pipeline init/completion subworkflow; default `meta.build`
 
 **Files:**
-- Create: `$DEST/subworkflows/local/utils_nfcore_shared_draft_sumstats/main.nf` (copied from source, then edited)
+- Create: `$DEST/subworkflows/local/utils_nfcore_shared_shared_sumstats/main.nf` (copied from source, then edited)
 
 - [ ] **Step 1: Copy the local pipeline subworkflow (renamed dir)**
 
 ```bash
 mkdir -p "$DEST/subworkflows/local"
-cp -R "$SRC/subworkflows/local/utils_nfcore_draft_sumstats" \
-      "$DEST/subworkflows/local/utils_nfcore_shared_draft_sumstats"
+cp -R "$SRC/subworkflows/local/utils_nfcore_shared_sumstats" \
+      "$DEST/subworkflows/local/utils_nfcore_shared_shared_sumstats"
 ```
 
 - [ ] **Step 2: Default `meta.build` from `params.genome_build`**
 
-In `$DEST/subworkflows/local/utils_nfcore_shared_draft_sumstats/main.nf`, find:
+In `$DEST/subworkflows/local/utils_nfcore_shared_shared_sumstats/main.nf`, find:
 
 ```groovy
     channel
@@ -336,13 +336,13 @@ Replace with (injects build default):
 
 - [ ] **Step 3: Verify no stale path references**
 
-Run: `grep -n "sumstats" "$DEST/subworkflows/local/utils_nfcore_shared_draft_sumstats/main.nf" | grep -i georgelab`
+Run: `grep -n "sumstats" "$DEST/subworkflows/local/utils_nfcore_shared_shared_sumstats/main.nf" | grep -i georgelab`
 Expected: no output (the file references `workflow.manifest.name` dynamically, so no hardcoded repo name needs changing).
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git -C "$DEST" add subworkflows/local/utils_nfcore_shared_draft_sumstats
+git -C "$DEST" add subworkflows/local/utils_nfcore_shared_shared_sumstats
 git -C "$DEST" commit -m "feat: port pipeline init/completion subworkflow; default meta.build"
 ```
 
@@ -826,15 +826,15 @@ Then in `$DEST/main.nf`:
 (a) Update the include paths for the renamed init subworkflow. Find:
 
 ```groovy
-include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_draft_sumstats'
-include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_draft_sumstats'
+include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_shared_sumstats'
+include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_shared_sumstats'
 ```
 
 Replace with:
 
 ```groovy
-include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_shared_draft_sumstats'
-include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_shared_draft_sumstats'
+include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_shared_shared_sumstats'
+include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_shared_shared_sumstats'
 ```
 
 (b) Update the named wrapper workflow to drop the unused `outdir` arg. Find:

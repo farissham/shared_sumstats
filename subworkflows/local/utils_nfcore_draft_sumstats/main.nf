@@ -1,5 +1,5 @@
 //
-// Subworkflow with functionality specific to the bernooi/draft_sumstats pipeline
+// Subworkflow with functionality specific to the bernooi/shared_sumstats pipeline
 //
 
 /*
