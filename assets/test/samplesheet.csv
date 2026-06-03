@@ -1,0 +1,2 @@
+id,sumstats,format,n,ancestry,trait,pop_prev,build
+demo,assets/test/gwas_ssf_demo.tsv,gwas-ssf,10000,EUR,Demo trait,,GRCh37
