@@ -1,0 +1,38 @@
+nextflow_process {
+
+    name "Test HARMONISE_GWAMA"
+    script "modules/local/harmonise_gwama.nf"
+    process "HARMONISE_GWAMA"
+
+    test("gwama demo harmonises to the hub columns") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'demo', format:'gwama', n:9500, ancestry:'EUR', trait:'Demo', build:'GRCh37' ],
+                    file("${projectDir}/assets/test/gwama_demo.tsv")
+                ]
+                input[1] = file("${projectDir}/assets/test/snp.info")
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out.harmonised[0][1]).linesGzip
+            // canonical hub header
+            assert lines[0] == "rsid\tchr\tpos\tea\toa\teaf\tbeta\tse\tp\tn\tz"
+            // rs7 is absent from snp.info -> dropped on join (8 input -> 7 data rows).
+            def data = lines.findAll { it ==~ /^rs\d.*/ }
+            assert data.size() == 7
+            // rs3 flip: GWAMA reference_allele=A == ref A2, so ea stays ref A1=G,
+            // beta sign flipped to negative, eaf -> 1 - 0.81 = 0.19
+            def rs3 = data.find { it.startsWith("rs3\t") }.split("\t")
+            assert rs3[3] == "G"                        // ea == ref A1
+            assert rs3[4] == "A"                        // oa == ref A2
+            assert (rs3[6] as double) < 0               // beta flipped negative
+            assert Math.abs((rs3[5] as double) - 0.19) < 1e-9   // eaf flipped
+            // fixed N injected from meta.n
+            assert (rs3[9] as double) == 9500
+        }
+    }
+}

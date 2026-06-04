@@ -9,7 +9,7 @@ analysis of GWAS summary statistics. Ported from `bernooi/sumstats`.
 ## Status
 
 - [x] Phase 1: scaffold + HARMONISE layer (gwas-ssf) -> harmonised hub
-- [ ] Phase 2: gwama/hail/cvdkp harmonise paths
+- [~] Phase 2: harmonise paths — gwama done; hail/cvdkp pending
 - [ ] Phase 3: SBayesRC module
 - [ ] Phase 4: LDSC module
 - [ ] Phase 5: report assembler (fragments)
