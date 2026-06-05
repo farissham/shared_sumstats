@@ -33,6 +33,12 @@ nextflow_process {
             assert Math.abs((rs3[5] as double) - 0.19) < 1e-9   // eaf flipped
             // fixed N injected from meta.n
             assert (rs3[9] as double) == 9500
+            // rs5 has eaf == -9 (GWAMA missing-value sentinel): must NOT leak -9/10
+            // into the hub; falls back to the LD reference A1Freq (snp.info rs5 = 0.10)
+            def rs5 = data.find { it.startsWith("rs5\t") }.split("\t")
+            assert Math.abs((rs5[5] as double) - 0.10) < 1e-9
+            // no row may carry the sentinel as a frequency
+            data.each { assert !(it.split("\t")[5] in ["-9", "10"]) }
         }
     }
 }

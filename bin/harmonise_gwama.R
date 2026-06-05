@@ -52,8 +52,8 @@ if (!"rsid" %in% names(dt)) {
     dt <- rmap[dt, nomatch = NULL]
 }
 
-# ---- join to LD ref snp.info on rsID -> attach chr/pos + ref alleles ----
-snpinfo <- fread(opt$snp_info, select = c("Chrom", "ID", "PhysPos", "A1", "A2"))
+# ---- join to LD ref snp.info on rsID -> attach chr/pos + ref alleles + A1Freq ----
+snpinfo <- fread(opt$snp_info, select = c("Chrom", "ID", "PhysPos", "A1", "A2", "A1Freq"))
 setnames(snpinfo, c("Chrom", "ID", "PhysPos"), c("chr", "rsid", "pos"))
 setkey(snpinfo, rsid); setkey(dt, rsid)
 m <- snpinfo[dt, nomatch = NULL]
@@ -66,7 +66,15 @@ m[, flip := fcase(
 )]
 m <- m[!is.na(flip)]                       # drop ambiguous / non-matching alleles
 m[, beta_out := fifelse(flip, -beta, beta)]
-m[, eaf_out  := fifelse(flip, 1 - eaf, eaf)]
+
+# eaf: GWAMA frequently writes -9 (or omits eaf) when input studies lack it, so a
+# raw flip would emit -9/10 into the hub. Use the study eaf only when it is a valid
+# frequency in [0,1]; otherwise fall back to the LD reference A1Freq, which is the
+# frequency of A1 == ea (no flip needed). Mirrors preprocess_gwama.R's freq = A1Freq.
+m[, eaf_num := suppressWarnings(as.numeric(eaf))]
+m[, eaf_out := fifelse(!is.na(eaf_num) & eaf_num >= 0 & eaf_num <= 1,
+                       fifelse(flip, 1 - eaf_num, eaf_num),
+                       A1Freq)]
 
 out <- m[, .(rsid = rsid,
              chr  = chr,
