@@ -41,4 +41,31 @@ nextflow_process {
             data.each { assert !(it.split("\t")[5] in ["-9", "10"]) }
         }
     }
+
+    test("gwama with rsIDs in rs_number harmonises without a map") {
+        // Real GWAMA output carries rsIDs in `rs_number` when input studies used
+        // rsID marker names (e.g. the MAGIC glucose meta-analysis). No rsid column,
+        // no chr:pos -> the rsID must be taken directly from rs_number (path #1).
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'rsnum', format:'gwama', n:9500, ancestry:'EUR', trait:'Demo', build:'GRCh37' ],
+                    file("${projectDir}/assets/test/gwama_rsnum_demo.tsv")
+                ]
+                input[1] = file("${projectDir}/assets/test/snp.info")
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out.harmonised[0][1]).linesGzip
+            assert lines[0] == "rsid\tchr\tpos\tea\toa\teaf\tbeta\tse\tp\tn\tz"
+            def data = lines.findAll { it ==~ /^rs\d.*/ }
+            assert data.size() == 7                          // rs7 absent from snp.info
+            def rs3 = data.find { it.startsWith("rs3\t") }.split("\t")
+            assert rs3[3] == "G" && rs3[4] == "A"            // oriented to ref A1/A2
+            assert (rs3[6] as double) < 0                    // beta flipped
+        }
+    }
 }

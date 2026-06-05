@@ -41,15 +41,26 @@ missing <- setdiff(needed, names(dt))
 if (length(missing)) stop("GWAMA sumstats missing required columns: ",
                           paste(missing, collapse = ", "))
 
-# ---- attach rsid: use existing column, else look up via rsid_map on chr:pos ----
+# ---- attach rsid ----
+# GWAMA's marker column `rs_number` may hold actual rsIDs OR a chr:pos string,
+# depending on the input studies. Resolve in priority order:
+#   1. an explicit `rsid` column
+#   2. rs_number that already looks like rsIDs (rs#######) -> use directly (build-agnostic)
+#   3. otherwise treat rs_number as chr:pos and translate to rsID via --rsid_map
 if (!"rsid" %in% names(dt)) {
-    if (is.na(opt$rsid_map) || !file.exists(opt$rsid_map))
-        stop("Input has no 'rsid' column and --rsid_map was not provided or does not exist.")
-    if ("rs_number" %in% names(dt) && !all(c("CHR", "POS") %in% names(dt)))
-        dt[, c("CHR", "POS") := tstrsplit(rs_number, ":", fixed = TRUE, type.convert = TRUE)]
-    rmap <- fread(opt$rsid_map, select = c("CHR", "POS", "rsid"))
-    setkey(rmap, CHR, POS); setkey(dt, CHR, POS)
-    dt <- rmap[dt, nomatch = NULL]
+    rsnum_is_rsid <- "rs_number" %in% names(dt) &&
+        mean(grepl("^rs[0-9]+$", head(dt$rs_number, 1000L))) > 0.5
+    if (rsnum_is_rsid) {
+        setnames(dt, "rs_number", "rsid")
+    } else {
+        if (is.na(opt$rsid_map) || !file.exists(opt$rsid_map))
+            stop("rs_number is not rsID-formatted and --rsid_map was not provided or does not exist.")
+        if ("rs_number" %in% names(dt) && !all(c("CHR", "POS") %in% names(dt)))
+            dt[, c("CHR", "POS") := tstrsplit(rs_number, ":", fixed = TRUE, type.convert = TRUE)]
+        rmap <- fread(opt$rsid_map, select = c("CHR", "POS", "rsid"))
+        setkey(rmap, CHR, POS); setkey(dt, CHR, POS)
+        dt <- rmap[dt, nomatch = NULL]
+    }
 }
 
 # ---- join to LD ref snp.info on rsID -> attach chr/pos + ref alleles + A1Freq ----
