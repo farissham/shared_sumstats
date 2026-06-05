@@ -68,4 +68,49 @@ nextflow_process {
             assert (rs3[6] as double) < 0                    // beta flipped
         }
     }
+
+    test("build matcher: chr:pos on the panel build resolves rsIDs from snp.info") {
+        // rs_number is chr:pos, no rsid column, no external map. Because the input
+        // build (GRCh37) equals the panel build, the build matcher derives the
+        // chr:pos -> rsID map straight from snp.info.
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'chrpos', format:'gwama', n:9500, ancestry:'EUR', trait:'Demo', build:'GRCh37' ],
+                    file("${projectDir}/assets/test/gwama_chrpos_demo.tsv")
+                ]
+                input[1] = file("${projectDir}/assets/test/snp.info")
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out.harmonised[0][1]).linesGzip
+            assert lines[0] == "rsid\tchr\tpos\tea\toa\teaf\tbeta\tse\tp\tn\tz"
+            def data = lines.findAll { it ==~ /^rs\d.*/ }
+            assert data.size() == 7                          // 7:7007 not in the panel
+            def rs3 = data.find { it.startsWith("rs3\t") }.split("\t")
+            assert rs3[3] == "G" && rs3[4] == "A" && (rs3[6] as double) < 0
+        }
+    }
+
+    test("build matcher: chr:pos on a non-panel build with no map fails loudly") {
+        // Same chr:pos input declared as GRCh38 (!= panel GRCh37) and no map: the
+        // build matcher cannot resolve rsIDs and must error rather than silently drop.
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'mismatch', format:'gwama', n:9500, ancestry:'EUR', trait:'Demo', build:'GRCh38' ],
+                    file("${projectDir}/assets/test/gwama_chrpos_demo.tsv")
+                ]
+                input[1] = file("${projectDir}/assets/test/snp.info")
+                """
+            }
+        }
+        then {
+            assert process.failed
+        }
+    }
 }

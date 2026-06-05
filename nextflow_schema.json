@@ -56,6 +56,12 @@
                     "default": "GRCh37",
                     "description": "Genome build recorded in meta.build when a samplesheet row omits it (record-only; no liftover)."
                 },
+                "ld_ref_build": {
+                    "type": "string",
+                    "enum": ["GRCh37", "GRCh38"],
+                    "default": "GRCh37",
+                    "description": "Genome build of the LD reference snp.info; the gwama build matcher derives a chr:pos->rsID map directly from snp.info for inputs on this build."
+                },
                 "modules": {
                     "type": "string",
                     "default": "",

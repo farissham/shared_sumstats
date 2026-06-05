@@ -15,11 +15,14 @@ process HARMONISE_GWAMA {
 
     script:
     def rsid_map_arg = meta.rsid_map ? "--rsid_map ${meta.rsid_map}" : ""
+    def build_arg    = meta.build    ? "--build ${meta.build}"       : ""
     """
     harmonise_gwama.R \\
         --input ${sumstats} \\
         --snp_info ${snp_info} \\
         --n ${meta.n} \\
+        ${build_arg} \\
+        --panel_build ${params.ld_ref_build} \\
         ${rsid_map_arg} \\
         --output ${meta.id}.harmonised.tsv.gz
 
