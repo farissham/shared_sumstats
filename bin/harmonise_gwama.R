@@ -33,6 +33,10 @@ opt <- parse_args(OptionParser(option_list = list(
                 help = "Genome build of the LD reference snp.info (default GRCh37)."),
     make_option("--min_match",   type = "double",    default = 0.01,
                 help = "Minimum chr:pos match rate before flagging a build mismatch (default 0.01)."),
+    make_option("--palindrome_maf", type = "double", default = 0.42,
+                help = "Resolve palindromic (A/T, C/G) SNPs by frequency only when MAF <= this (default 0.42); else drop as unresolvable."),
+    make_option("--assume_forward_strand", action = "store_true", default = FALSE,
+                help = "Keep unresolved palindromic SNPs assuming forward strand instead of dropping them."),
     make_option("--n",           type = "integer",   help = "Sample size to inject"),
     make_option("--output",      type = "character", help = "Output harmonised .tsv.gz path")
 )))
@@ -100,23 +104,54 @@ if (!"rsid" %in% names(dt)) {
 setkey(snpinfo, rsid); setkey(dt, rsid)
 m <- snpinfo[dt, nomatch = NULL]
 
-# ---- orient to ea = ref A1 (flip beta + eaf when reference_allele is A2) ----
-# GWAMA's `eaf` is the frequency of reference_allele.
-m[, flip := fcase(
-    reference_allele == A1 & other_allele == A2, FALSE,
-    reference_allele == A2 & other_allele == A1, TRUE
-)]
-m <- m[!is.na(flip)]                       # drop ambiguous / non-matching alleles
-m[, beta_out := fifelse(flip, -beta, beta)]
+# ---- orient alleles to the panel (ea = A1) with strand-flip + palindrome handling ----
+# `reference_allele` is the effect allele; `eaf` is its frequency. We must express
+# every variant as ea=A1, oa=A2 (panel orientation), flipping beta/eaf when needed.
+#   * exact match (same strand): ra/oa equal A1/A2 in some order.
+#   * opposite strand: the complement of ra/oa equals A1/A2 (recovers reverse-strand
+#     inputs that an exact-only match would silently drop).
+#   * palindromic SNPs (A/T, C/G): strand is unknowable from alleles, so orientation
+#     is inferred from allele frequency (study eaf vs reference A1Freq) and dropped
+#     when the MAF is too close to 0.5 to call (unless --assume_forward_strand).
+comp <- function(x) chartr("ACGTacgt", "TGCAtgca", x)
+m[, ra := reference_allele]
+m[, oa := other_allele]
+m[, eaf_num   := suppressWarnings(as.numeric(eaf))]
+m[, eaf_valid := !is.na(eaf_num) & eaf_num >= 0 & eaf_num <= 1]
+m[, biallelic := nchar(ra) == 1L & nchar(oa) == 1L & nchar(A1) == 1L & nchar(A2) == 1L]
+m[, cra := fifelse(biallelic, comp(ra), NA_character_)]
+m[, coa := fifelse(biallelic, comp(oa), NA_character_)]
+m[, palindromic := biallelic & (oa == cra)]          # {A,T} or {C,G}
+m[, set_ok := (ra == A1 & oa == A2) | (ra == A2 & oa == A1)]
 
-# eaf: GWAMA frequently writes -9 (or omits eaf) when input studies lack it, so a
-# raw flip would emit -9/10 into the hub. Use the study eaf only when it is a valid
-# frequency in [0,1]; otherwise fall back to the LD reference A1Freq, which is the
-# frequency of A1 == ea (no flip needed). Mirrors preprocess_gwama.R's freq = A1Freq.
-m[, eaf_num := suppressWarnings(as.numeric(eaf))]
-m[, eaf_out := fifelse(!is.na(eaf_num) & eaf_num >= 0 & eaf_num <= 1,
-                       fifelse(flip, 1 - eaf_num, eaf_num),
-                       A1Freq)]
+m[, flip := NA]
+m[, aclass := NA_character_]
+
+# palindromic SNPs first: resolve strand by frequency only (never trust the letters)
+pal_maf <- opt$palindrome_maf
+m[palindromic & set_ok & eaf_valid &
+    pmin(eaf_num, 1 - eaf_num) <= pal_maf & pmin(A1Freq, 1 - A1Freq) <= pal_maf,
+    `:=`(flip = abs(eaf_num - (1 - A1Freq)) < abs(eaf_num - A1Freq), aclass = "palindrome")]
+if (isTRUE(opt$assume_forward_strand))   # opt-in: keep unresolved palindromes as-is
+    m[palindromic & set_ok & is.na(flip),
+        `:=`(flip = (ra == A2), aclass = "palindrome_assumed")]
+
+# non-palindromic: exact (same-strand) match, then opposite-strand recovery
+m[is.na(flip) & !palindromic & ra == A1 & oa == A2, `:=`(flip = FALSE, aclass = "same")]
+m[is.na(flip) & !palindromic & ra == A2 & oa == A1, `:=`(flip = TRUE,  aclass = "same")]
+m[is.na(flip) & biallelic & !palindromic & cra == A1 & coa == A2, `:=`(flip = FALSE, aclass = "strand")]
+m[is.na(flip) & biallelic & !palindromic & cra == A2 & coa == A1, `:=`(flip = TRUE,  aclass = "strand")]
+
+n_pre <- nrow(m)
+m <- m[!is.na(flip)]                       # drop mismatches + unresolved palindromes
+cat(sprintf("[orient] kept %d/%d  (same=%d strand=%d palindrome=%d), dropped %d\n",
+            nrow(m), n_pre, sum(m$aclass %in% c("same")), sum(m$aclass == "strand"),
+            sum(m$aclass %in% c("palindrome", "palindrome_assumed")), n_pre - nrow(m)))
+
+m[, beta_out := fifelse(flip, -beta, beta)]
+# eaf: prefer the (oriented) study eaf; fall back to A1Freq (= freq of ea==A1) when the
+# study eaf is missing/sentinel (e.g. GWAMA writes -9). Mirrors preprocess_gwama.R.
+m[, eaf_out := fifelse(eaf_valid, fifelse(flip, 1 - eaf_num, eaf_num), A1Freq)]
 
 out <- m[, .(rsid = rsid,
              chr  = chr,

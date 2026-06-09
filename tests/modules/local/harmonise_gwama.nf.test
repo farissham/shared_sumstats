@@ -33,10 +33,10 @@ nextflow_process {
             assert Math.abs((rs3[5] as double) - 0.19) < 1e-9   // eaf flipped
             // fixed N injected from meta.n
             assert (rs3[9] as double) == 9500
-            // rs5 has eaf == -9 (GWAMA missing-value sentinel): must NOT leak -9/10
-            // into the hub; falls back to the LD reference A1Freq (snp.info rs5 = 0.10)
-            def rs5 = data.find { it.startsWith("rs5\t") }.split("\t")
-            assert Math.abs((rs5[5] as double) - 0.10) < 1e-9
+            // rs2 (non-palindromic C/T) has eaf == -9 (GWAMA missing sentinel): must NOT
+            // leak -9/10; falls back to the LD reference A1Freq (snp.info rs2 = 0.45)
+            def rs2 = data.find { it.startsWith("rs2\t") }.split("\t")
+            assert Math.abs((rs2[5] as double) - 0.45) < 1e-9
             // no row may carry the sentinel as a frequency
             data.each { assert !(it.split("\t")[5] in ["-9", "10"]) }
         }
@@ -92,6 +92,47 @@ nextflow_process {
             assert data.size() == 7                          // 7:7007 not in the panel
             def rs3 = data.find { it.startsWith("rs3\t") }.split("\t")
             assert rs3[3] == "G" && rs3[4] == "A" && (rs3[6] as double) < 0
+        }
+    }
+
+    test("strand flip + palindrome resolution") {
+        // rs1: reverse-strand non-palindrome (T/C vs panel A/G) -> recovered, no flip
+        // rs9: reverse-strand + allele swap (C/T vs panel A/G)  -> recovered, flipped
+        // rs6: palindrome C/G, eaf 0.62 ~ 1-A1Freq(0.40)        -> resolved, flipped
+        // rs8: palindrome G/C, eaf 0.33 ~ A1Freq(0.35)          -> resolved, no flip
+        // rs5: palindrome A/T, eaf 0.49 (MAF>0.42)              -> unresolvable, DROPPED
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'strand', format:'gwama', n:9500, ancestry:'EUR', trait:'Demo', build:'GRCh37' ],
+                    file("${projectDir}/assets/test/gwama_strand_demo.tsv")
+                ]
+                input[1] = file("${projectDir}/assets/test/snp.info")
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out.harmonised[0][1]).linesGzip
+            def data  = lines.findAll { it ==~ /^rs\d.*/ }
+            def row   = { id -> data.find { it.startsWith("${id}\t") }?.split("\t") }
+            assert data.size() == 4                          // rs5 dropped (unresolvable palindrome)
+            assert row('rs5') == null
+            // rs1 reverse strand recovered, oriented to panel A/G, beta sign kept
+            assert row('rs1')[3] == "A" && row('rs1')[4] == "G"
+            assert (row('rs1')[6] as double) > 0
+            assert Math.abs((row('rs1')[5] as double) - 0.30) < 1e-9
+            // rs9 reverse strand + swap -> beta flipped negative, eaf -> 0.25
+            assert (row('rs9')[6] as double) < 0
+            assert Math.abs((row('rs9')[5] as double) - 0.25) < 1e-9
+            // rs6 palindrome flipped: beta negative, eaf -> 1-0.62 = 0.38
+            assert row('rs6')[3] == "C" && row('rs6')[4] == "G"
+            assert (row('rs6')[6] as double) < 0
+            assert Math.abs((row('rs6')[5] as double) - 0.38) < 1e-9
+            // rs8 palindrome not flipped: beta positive, eaf stays 0.33
+            assert (row('rs8')[6] as double) > 0
+            assert Math.abs((row('rs8')[5] as double) - 0.33) < 1e-9
         }
     }
 

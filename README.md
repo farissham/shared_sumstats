@@ -50,6 +50,19 @@ on the input studies. The rsID join to the panel is build-agnostic, but the
 If the matched fraction is implausibly low (default `< 1%`), the run fails with a
 "declared build is likely wrong" error rather than silently dropping ~all variants.
 
+### Allele orientation (strand + palindromes)
+
+Alleles are oriented to the panel (`ea = A1`, flipping `beta`/`eaf` as needed):
+
+- **exact match** (same strand): `ra`/`oa` equal `A1`/`A2` in some order;
+- **opposite strand**: the complement of `ra`/`oa` equals `A1`/`A2` — reverse-strand
+  inputs are recovered instead of being silently dropped;
+- **palindromic SNPs** (`A/T`, `C/G`): strand is unknowable from the alleles, so
+  orientation is inferred from allele frequency (study `eaf` vs reference `A1Freq`).
+  Palindromes are **dropped** when the MAF is too close to 0.5 to call (default
+  `--palindrome_maf 0.42`) or when `eaf` is missing — pass `--assume_forward_strand`
+  to keep them on the forward-strand assumption instead.
+
 ## Monitoring with Seqera Platform (Tower)
 
 Live run monitoring is **opt-in** and activates automatically when a
