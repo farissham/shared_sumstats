@@ -9,7 +9,7 @@ analysis of GWAS summary statistics. Ported from `bernooi/sumstats`.
 ## Status
 
 - [x] Phase 1: scaffold + HARMONISE layer (gwas-ssf) -> harmonised hub
-- [~] Phase 2: harmonise paths — gwama done; hail/cvdkp pending
+- [x] Phase 2: harmonise paths — gwas-ssf, gwama, hail, cvdkp (unified `bin/harmonise.R`)
 - [ ] Phase 3: SBayesRC module
 - [ ] Phase 4: LDSC module
 - [ ] Phase 5: report assembler (fragments)
@@ -32,11 +32,21 @@ Every input format is normalised to one canonical artifact,
 rsID is the canonical join key; `chr`/`pos` are attached from the LD reference
 `snp.info` (record-only build, see the design spec).
 
-## GWAMA inputs and the build matcher
+## Harmonisers, the build matcher, and orientation
 
-GWAMA's `rs_number` column may hold actual rsIDs *or* a `chr:pos` string, depending
-on the input studies. The rsID join to the panel is build-agnostic, but the
-`chr:pos -> rsID` step is build-sensitive, so the gwama path resolves it as follows:
+All formats are parsed by per-format functions in `bin/harmonise.R`, which normalise
+each layout to a common intermediate and then run the **same** shared steps:
+resolve rsID (build matcher) -> panel join -> allele orientation -> hub.
+
+| format | identifier | effect allele | notes |
+|--------|-----------|---------------|-------|
+| `gwas-ssf` | `rsid`/`variant_id` | `effect_allele` | per-SNP N (eff/total/n) |
+| `gwama` | `rs_number` (rsID *or* chr:pos) | `reference_allele` | fixed N; `eaf` may be `-9` |
+| `hail` | `locus` (chr:pos) + JSON `alleles` | ALT | always chr:pos -> build matcher |
+| `cvdkp` | `rsid` (rsID rows kept; chr:pos resolved/dropped) | `Allele1` | `log10(p)`, per-SNP eff N |
+
+Markers that are already rsIDs are used directly (build-agnostic). For `chr:pos`
+markers the rsID join is build-sensitive, so the **build matcher** resolves it:
 
 1. an explicit `rsid` column, if present;
 2. else, `rs_number` values that look like rsIDs (`rs#######`) are used directly;

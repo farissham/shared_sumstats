@@ -1,0 +1,140 @@
+nextflow_process {
+
+    name "Test HARMONISE_SUMSTATS"
+    script "modules/local/harmonise.nf"
+    process "HARMONISE_SUMSTATS"
+
+    test("gwas-ssf demo harmonises to the hub") {
+        when { process {
+            """
+            input[0] = [ [ id:'demo', format:'gwas-ssf', n:10000, build:'GRCh37' ],
+                         file("${projectDir}/assets/test/gwas_ssf_demo.tsv") ]
+            input[1] = file("${projectDir}/assets/test/snp.info")
+            """ } }
+        then {
+            assert process.success
+            def lines = path(process.out.harmonised[0][1]).linesGzip
+            assert lines[0] == "rsid\tchr\tpos\tea\toa\teaf\tbeta\tse\tp\tn\tz"
+            def data = lines.findAll { it ==~ /^rs\d.*/ }
+            assert data.size() == 7                                  // rs7 absent from panel
+            def rs3 = data.find { it.startsWith("rs3\t") }.split("\t")
+            assert rs3[3] == "G" && rs3[4] == "A" && (rs3[6] as double) < 0
+        }
+    }
+
+    test("gwama demo harmonises; -9 eaf falls back to A1Freq") {
+        when { process {
+            """
+            input[0] = [ [ id:'demo', format:'gwama', n:9500, build:'GRCh37' ],
+                         file("${projectDir}/assets/test/gwama_demo.tsv") ]
+            input[1] = file("${projectDir}/assets/test/snp.info")
+            """ } }
+        then {
+            assert process.success
+            def data = path(process.out.harmonised[0][1]).linesGzip.findAll { it ==~ /^rs\d.*/ }
+            assert data.size() == 7
+            def rs3 = data.find { it.startsWith("rs3\t") }.split("\t")
+            assert rs3[3] == "G" && (rs3[6] as double) < 0
+            // rs2 (non-palindromic C/T) eaf == -9 -> A1Freq 0.45, never -9/10
+            def rs2 = data.find { it.startsWith("rs2\t") }.split("\t")
+            assert Math.abs((rs2[5] as double) - 0.45) < 1e-9
+            data.each { assert !(it.split("\t")[5] in ["-9", "10"]) }
+        }
+    }
+
+    test("gwama with rsIDs in rs_number harmonises without a map") {
+        when { process {
+            """
+            input[0] = [ [ id:'rsnum', format:'gwama', n:9500, build:'GRCh37' ],
+                         file("${projectDir}/assets/test/gwama_rsnum_demo.tsv") ]
+            input[1] = file("${projectDir}/assets/test/snp.info")
+            """ } }
+        then {
+            assert process.success
+            def data = path(process.out.harmonised[0][1]).linesGzip.findAll { it ==~ /^rs\d.*/ }
+            assert data.size() == 7
+            assert (data.find { it.startsWith("rs3\t") }.split("\t")[6] as double) < 0
+        }
+    }
+
+    test("build matcher: chr:pos on the panel build resolves rsIDs from snp.info") {
+        when { process {
+            """
+            input[0] = [ [ id:'chrpos', format:'gwama', n:9500, build:'GRCh37' ],
+                         file("${projectDir}/assets/test/gwama_chrpos_demo.tsv") ]
+            input[1] = file("${projectDir}/assets/test/snp.info")
+            """ } }
+        then {
+            assert process.success
+            def data = path(process.out.harmonised[0][1]).linesGzip.findAll { it ==~ /^rs\d.*/ }
+            assert data.size() == 7
+            def rs3 = data.find { it.startsWith("rs3\t") }.split("\t")
+            assert rs3[3] == "G" && (rs3[6] as double) < 0
+        }
+    }
+
+    test("strand flip + palindrome resolution") {
+        when { process {
+            """
+            input[0] = [ [ id:'strand', format:'gwama', n:9500, build:'GRCh37' ],
+                         file("${projectDir}/assets/test/gwama_strand_demo.tsv") ]
+            input[1] = file("${projectDir}/assets/test/snp.info")
+            """ } }
+        then {
+            assert process.success
+            def data = path(process.out.harmonised[0][1]).linesGzip.findAll { it ==~ /^rs\d.*/ }
+            def row  = { id -> data.find { it.startsWith("${id}\t") }?.split("\t") }
+            assert data.size() == 4 && row('rs5') == null            // rs5 unresolvable palindrome dropped
+            assert row('rs1')[3] == "A" && row('rs1')[4] == "G" && (row('rs1')[6] as double) > 0
+            assert (row('rs9')[6] as double) < 0 && Math.abs((row('rs9')[5] as double) - 0.25) < 1e-9
+            assert (row('rs6')[6] as double) < 0 && Math.abs((row('rs6')[5] as double) - 0.38) < 1e-9
+            assert (row('rs8')[6] as double) > 0 && Math.abs((row('rs8')[5] as double) - 0.33) < 1e-9
+        }
+    }
+
+    test("build matcher: chr:pos on a non-panel build with no map fails loudly") {
+        when { process {
+            """
+            input[0] = [ [ id:'mismatch', format:'gwama', n:9500, build:'GRCh38' ],
+                         file("${projectDir}/assets/test/gwama_chrpos_demo.tsv") ]
+            input[1] = file("${projectDir}/assets/test/snp.info")
+            """ } }
+        then { assert process.failed }
+    }
+
+    test("hail demo harmonises (locus + JSON alleles, effect=ALT)") {
+        when { process {
+            """
+            input[0] = [ [ id:'hail', format:'hail', n:8000, build:'GRCh37' ],
+                         file("${projectDir}/assets/test/hail_demo.tsv") ]
+            input[1] = file("${projectDir}/assets/test/snp.info")
+            """ } }
+        then {
+            assert process.success
+            def lines = path(process.out.harmonised[0][1]).linesGzip
+            assert lines[0] == "rsid\tchr\tpos\tea\toa\teaf\tbeta\tse\tp\tn\tz"
+            def data = lines.findAll { it ==~ /^rs\d.*/ }
+            assert data.size() == 7                                  // rs7 absent from panel
+            def rs3 = data.find { it.startsWith("rs3\t") }.split("\t")
+            assert rs3[3] == "G" && rs3[4] == "A" && (rs3[6] as double) < 0
+        }
+    }
+
+    test("cvdkp demo harmonises (rsID filter, log10 p, per-SNP effective N)") {
+        when { process {
+            """
+            input[0] = [ [ id:'cvdkp', format:'cvdkp', n:5000, build:'GRCh37' ],
+                         file("${projectDir}/assets/test/cvdkp_demo.tsv") ]
+            input[1] = file("${projectDir}/assets/test/snp.info")
+            """ } }
+        then {
+            assert process.success
+            def data = path(process.out.harmonised[0][1]).linesGzip.findAll { it ==~ /^rs\d.*/ }
+            assert data.size() == 7                                  // 7 rsIDs in panel; 2:9999 chr:pos dropped
+            def rs3 = data.find { it.startsWith("rs3\t") }.split("\t")
+            assert rs3[3] == "G" && (rs3[6] as double) < 0
+            // effective N = 4*2000*8000/10000 = 6400 (per-SNP, not the fallback 5000)
+            assert (rs3[9] as double) == 6400
+        }
+    }
+}

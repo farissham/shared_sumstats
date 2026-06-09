@@ -1,11 +1,11 @@
 //
-// HARMONISE: branch raw sumstats by input format, normalise each to the
-// canonical harmonised-sumstats hub (<id>.harmonised.tsv.gz).
-// Ported paths: gwas-ssf, gwama. Remaining formats fail loudly until ported.
+// HARMONISE: normalise raw sumstats of any supported format to the canonical
+// harmonised-sumstats hub (<id>.harmonised.tsv.gz). Format-specific parsing,
+// the build matcher, and allele orientation all live in bin/harmonise.R; this
+// layer just validates the format and dispatches.
 //
 
-include { HARMONISE_GWAS_SSF } from '../../../modules/local/harmonise_gwas_ssf'
-include { HARMONISE_GWAMA    } from '../../../modules/local/harmonise_gwama'
+include { HARMONISE_SUMSTATS } from '../../../modules/local/harmonise'
 
 workflow HARMONISE {
 
@@ -16,26 +16,17 @@ workflow HARMONISE {
     main:
     ch_versions = Channel.empty()
 
-    def ch_branched = ch_samplesheet.branch {
-        gwas_ssf: it[0].format == 'gwas-ssf'
-        gwama:    it[0].format == 'gwama'
-        other:    true
+    def supported = ['gwas-ssf', 'gwama', 'hail', 'cvdkp']
+    def ch_in = ch_samplesheet.map { meta, sumstats ->
+        if (!(meta.format in supported))
+            error "HARMONISE: unsupported format '${meta.format}' for id='${meta.id}' (supported: ${supported.join(', ')})"
+        [ meta, sumstats ]
     }
 
-    // Surface unported formats as a hard error instead of silently dropping the trait.
-    ch_branched.other.map { meta, sumstats ->
-        error "HARMONISE: format '${meta.format}' is not yet ported (supported: gwas-ssf, gwama) for id='${meta.id}'"
-    }
-
-    HARMONISE_GWAS_SSF(ch_branched.gwas_ssf, snp_info)
-    HARMONISE_GWAMA(ch_branched.gwama, snp_info)
-
-    ch_harmonised = HARMONISE_GWAS_SSF.out.harmonised.mix(HARMONISE_GWAMA.out.harmonised)
-    ch_versions   = ch_versions
-        .mix(HARMONISE_GWAS_SSF.out.versions)
-        .mix(HARMONISE_GWAMA.out.versions)
+    HARMONISE_SUMSTATS(ch_in, snp_info)
+    ch_versions = ch_versions.mix(HARMONISE_SUMSTATS.out.versions)
 
     emit:
-    harmonised = ch_harmonised   // [ meta, harmonised.tsv.gz ]
-    versions   = ch_versions     // path versions.yml
+    harmonised = HARMONISE_SUMSTATS.out.harmonised   // [ meta, harmonised.tsv.gz ]
+    versions   = ch_versions                          // path versions.yml
 }
