@@ -54,11 +54,18 @@ markers the rsID join is build-sensitive, so the **build matcher** resolves it:
    - if the input's `build` (samplesheet column, default `params.genome_build`)
      equals the panel build (`params.ld_ref_build`, default `GRCh37`), the map is
      derived directly from `snp.info` — no external file needed;
-   - otherwise, supply a build-matched `chr,pos,rsid` map via the row's `rsid_map`
-     (or liftover the input to the panel build first).
+   - else, if the row supplies a UCSC `chain` (input build -> panel build), the
+     `chr:pos` are **lifted over** to the panel build (inline, pure-R, no external
+     tools) and then resolved from `snp.info`;
+   - otherwise, supply a build-matched `chr,pos,rsid` map via the row's `rsid_map`.
 
 If the matched fraction is implausibly low (default `< 1%`), the run fails with a
 "declared build is likely wrong" error rather than silently dropping ~all variants.
+
+Liftover runs only for cross-build `chr:pos` markers, immediately before the rsID
+lookup; rsID and same-build markers skip it. Positions in chain gaps or on
+chromosomes the chain doesn't cover are dropped. (`meta.chain` / `meta.rsid_map`
+paths must be readable by the task container.)
 
 ### Allele orientation (strand + palindromes)
 

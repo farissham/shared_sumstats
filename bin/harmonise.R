@@ -17,6 +17,8 @@ opt <- parse_args(OptionParser(option_list = list(
     make_option("--snp_info",    type = "character", help = "LD reference snp.info"),
     make_option("--rsid_map",    type = "character", default = NA,
                 help = "Optional chr,pos,rsid map (must match the input build) for chr:pos markers."),
+    make_option("--chain",       type = "character", default = NA,
+                help = "Optional UCSC .chain (input build -> panel build); lifts chr:pos markers before resolution."),
     make_option("--build",       type = "character", default = NA,
                 help = "Declared genome build of chr:pos markers (e.g. GRCh37/GRCh38)."),
     make_option("--panel_build", type = "character", default = "GRCh37",
@@ -38,6 +40,47 @@ read_any <- function(path) if (grepl("\\.gz$", path, ignore.case = TRUE))
     fread(cmd = sprintf("zcat %s", shQuote(path))) else fread(path)
 need <- function(d, cols) { miss <- setdiff(cols, names(d))
     if (length(miss)) stop(sprintf("[%s] missing columns: %s", opt$format, paste(miss, collapse = ", "))) }
+
+# Minimal pure-R UCSC chain liftover (no external tools). Lifts a table with
+# integer CHR/POS (1-based) from the chain's source (target) assembly to its
+# destination (query) assembly. Handles +/- query strand; positions in gaps or
+# on chromosomes/blocks the chain doesn't cover are dropped.
+liftover_chain <- function(pos_dt, chain_path) {
+    stopifnot(file.exists(chain_path))
+    ln <- readLines(chain_path); ln <- ln[nzchar(trimws(ln))]
+    n <- length(ln)
+    chrom <- character(n); bstart <- numeric(n); bend <- numeric(n)
+    qlo <- numeric(n); qstr <- character(n); qsz <- numeric(n); qnm <- character(n)
+    j <- 0L; ct <- 0; cq <- 0; tN <- qN <- qStrand <- NA_character_; qSize <- 0
+    for (k in seq_len(n)) {
+        f <- strsplit(trimws(ln[k]), "[[:space:]]+")[[1]]
+        if (f[1] == "chain") {
+            tN <- sub("^chr", "", f[3]); ct <- as.numeric(f[6])
+            qN <- sub("^chr", "", f[8]); qSize <- as.numeric(f[9]); qStrand <- f[10]; cq <- as.numeric(f[11])
+        } else {
+            p <- as.numeric(f); size <- p[1]
+            j <- j + 1L
+            chrom[j] <- tN; bstart[j] <- ct; bend[j] <- ct + size - 1
+            qlo[j] <- cq; qstr[j] <- qStrand; qsz[j] <- qSize; qnm[j] <- qN
+            ct <- ct + size + (if (length(p) >= 2) p[2] else 0)
+            cq <- cq + size + (if (length(p) >= 3) p[3] else 0)
+        }
+    }
+    if (j == 0L) return(pos_dt[0L])
+    blocks <- data.table(chrom = chrom[1:j], bstart = bstart[1:j], bend = bend[1:j],
+                         qlo = qlo[1:j], qstr = qstr[1:j], qsz = qsz[1:j], qnm = qnm[1:j])
+    setkey(blocks, chrom, bstart, bend)
+    q <- data.table(chrom = as.character(pos_dt$CHR),
+                    pstart = as.numeric(pos_dt$POS) - 1, .idx = seq_len(nrow(pos_dt)))
+    q[, pend := pstart]
+    ov <- foverlaps(q, blocks, by.x = c("chrom", "pstart", "pend"),
+                    by.y = c("chrom", "bstart", "bend"), type = "within", nomatch = NULL)
+    ov[, q0 := fifelse(qstr == "+", qlo + (pstart - bstart), qsz - 1 - (qlo + (pstart - bstart)))]
+    res <- pos_dt[ov$.idx]
+    res[, CHR := suppressWarnings(as.integer(ov$qnm))]
+    res[, POS := as.integer(ov$q0 + 1)]
+    res[!is.na(CHR) & !is.na(POS)]
+}
 
 # ----------------------------- per-format parsers -----------------------------
 # Each returns: marker, ea_in (effect allele), oa_in, eaf_in, beta, se, p, n_row
@@ -128,8 +171,15 @@ by_pos <- s[is_pos == TRUE]
 if (nrow(by_pos)) {
     by_pos[, c("CHR", "POS") := tstrsplit(marker, ":", fixed = TRUE, type.convert = TRUE)]
     build <- if (is.na(opt$build) || !nzchar(opt$build)) opt$panel_build else opt$build
-    # [liftover hook] a future LIFTOVER step would rewrite CHR/POS to the panel build
-    # here when build != panel_build, collapsing this to the same-build case below.
+    # liftover: when chr:pos is on a non-panel build and a chain is supplied, rewrite
+    # CHR/POS to the panel build, collapsing this to the same-build case below.
+    if (!identical(build, opt$panel_build) && !is.na(opt$chain) && nzchar(opt$chain) && file.exists(opt$chain)) {
+        n0 <- nrow(by_pos)
+        by_pos <- liftover_chain(by_pos, opt$chain)
+        cat(sprintf("[liftover] %s -> %s via %s: %d/%d positions lifted\n",
+                    build, opt$panel_build, basename(opt$chain), nrow(by_pos), n0))
+        build <- opt$panel_build
+    }
     if (!is.na(opt$rsid_map) && file.exists(opt$rsid_map)) {
         cat(sprintf("[build-match] external rsid map: %s\n", opt$rsid_map))
         rmap <- fread(opt$rsid_map, select = c("CHR", "POS", "rsid"))

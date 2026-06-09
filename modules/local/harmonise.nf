@@ -15,6 +15,7 @@ process HARMONISE_SUMSTATS {
 
     script:
     def rsid_map_arg = meta.rsid_map              ? "--rsid_map ${meta.rsid_map}" : ""
+    def chain_arg    = meta.chain                 ? "--chain ${meta.chain}"       : ""
     def build_arg    = meta.build                 ? "--build ${meta.build}"       : ""
     def fwd_arg      = meta.assume_forward_strand ? "--assume_forward_strand"     : ""
     """
@@ -26,6 +27,7 @@ process HARMONISE_SUMSTATS {
         ${build_arg} \\
         --panel_build ${params.ld_ref_build} \\
         ${rsid_map_arg} \\
+        ${chain_arg} \\
         ${fwd_arg} \\
         --output ${meta.id}.harmonised.tsv.gz
 

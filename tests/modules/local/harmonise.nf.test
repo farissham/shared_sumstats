@@ -102,6 +102,25 @@ nextflow_process {
         then { assert process.failed }
     }
 
+    test("liftover: cross-build chr:pos lifted to panel build via chain") {
+        when { process {
+            """
+            input[0] = [ [ id:'lift', format:'gwama', n:9500, build:'GRCh38',
+                           chain:"${projectDir}/assets/test/lift_38to37.chain" ],
+                         file("${projectDir}/assets/test/gwama_lift_demo.tsv") ]
+            input[1] = file("${projectDir}/assets/test/snp.info")
+            """ } }
+        then {
+            assert process.success
+            def data = path(process.out.harmonised[0][1]).linesGzip.findAll { it ==~ /^rs\d.*/ }
+            assert data.size() == 7                          // rs7 (chr7) not in chain -> dropped
+            def rs1 = data.find { it.startsWith("rs1\t") }.split("\t")
+            assert rs1[1] == "1" && rs1[2] == "1001"         // lifted GRCh38 2001 -> panel 1001
+            def rs3 = data.find { it.startsWith("rs3\t") }.split("\t")
+            assert rs3[3] == "G" && (rs3[6] as double) < 0
+        }
+    }
+
     test("hail demo harmonises (locus + JSON alleles, effect=ALT)") {
         when { process {
             """
