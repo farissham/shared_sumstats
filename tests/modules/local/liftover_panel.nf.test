@@ -1,0 +1,26 @@
+nextflow_process {
+
+    name "Test LIFTOVER_PANEL"
+    script "modules/local/liftover_panel.nf"
+    process "LIFTOVER_PANEL"
+
+    test("lifts the panel GRCh37 -> GRCh38 and emits a build-matched rsid map") {
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/assets/test/snp.info")
+                input[1] = file("${projectDir}/assets/test/lift_37to38.chain")
+                input[2] = "GRCh38"
+                """
+            }
+        }
+        then {
+            assert process.success
+            def map = path(process.out.rsid_map[0][1]).readLines()
+            assert map[0] == "CHR\tPOS\trsid"
+            // panel rs1 1:1001 -> b38 1:2001 ; rs5 2:5005 -> 2:7005 (chr2 +2000)
+            assert map.any { it == "1\t2001\trs1" }
+            assert map.any { it == "2\t7005\trs5" }
+        }
+    }
+}

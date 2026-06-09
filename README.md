@@ -67,6 +67,17 @@ lookup; rsID and same-build markers skip it. Positions in chain gaps or on
 chromosomes the chain doesn't cover are dropped. (`meta.chain` / `meta.rsid_map`
 paths must be readable by the task container.)
 
+There are two liftover options for cross-build `chr:pos` inputs:
+
+- **inline** (`meta.chain`): a dependency-free pure-R chain applier in `harmonise.R`
+  lifts the input's coordinates. Correct for the common single-block SNV case; does
+  not replicate liftOver's multi-chain/`minMatch` edge-case handling.
+- **`LIFTOVER_PANEL` module** (real UCSC `liftOver`, own container): lifts the
+  *panel* `snp.info` once to a target build, producing a build-matched `chr,pos,rsid`
+  map that the build matcher consumes via `rsid_map`. Parse-free, reusable across all
+  inputs of that build, and only ever lifts clean panel SNVs (liftOver's ~99.99% case).
+  Limited to panel SNPs (already the pipeline's scope) and to position-only matching.
+
 ### Allele orientation (strand + palindromes)
 
 Alleles are oriented to the panel (`ea = A1`, flipping `beta`/`eaf` as needed):
