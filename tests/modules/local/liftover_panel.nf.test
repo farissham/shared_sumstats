@@ -8,9 +8,8 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/assets/test/snp.info")
-                input[1] = file("${projectDir}/assets/test/lift_37to38.chain")
-                input[2] = "GRCh38"
+                input[0] = [ "GRCh38", file("${projectDir}/assets/test/lift_37to38.chain") ]
+                input[1] = file("${projectDir}/assets/test/snp.info")
                 """
             }
         }

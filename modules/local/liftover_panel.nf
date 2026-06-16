@@ -6,9 +6,8 @@ process LIFTOVER_PANEL {
     publishDir "${params.outdir}/liftover", mode: params.publish_dir_mode
 
     input:
+    tuple val(target_build), path(chain)
     path snp_info
-    path chain
-    val  target_build
 
     output:
     tuple val(target_build), path("${target_build}.rsid_map.tsv"), emit: rsid_map

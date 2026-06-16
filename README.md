@@ -78,6 +78,18 @@ There are two liftover options for cross-build `chr:pos` inputs:
   inputs of that build, and only ever lifts clean panel SNVs (liftOver's ~99.99% case).
   Limited to panel SNPs (already the pipeline's scope) and to position-only matching.
 
+The `LIFTOVER_PANEL` route is **auto-wired**: set `params.liftover_chains` to a
+`build -> chain` map, e.g.
+
+```groovy
+liftover_chains = [ GRCh38: '/refs/chains/hg38ToHg19.over.chain.gz' ]
+```
+
+and any samplesheet row whose `build` differs from `ld_ref_build` (and that has no
+`rsid_map`/`chain` of its own) triggers a one-off panel lift for that build, whose
+map is fed to the harmoniser automatically. Builds with no configured chain fall
+through to the normal resolution (rsID resolves; unmatched chr:pos errors loudly).
+
 ### Allele orientation (strand + palindromes)
 
 Alleles are oriented to the panel (`ea = A1`, flipping `beta`/`eaf` as needed):

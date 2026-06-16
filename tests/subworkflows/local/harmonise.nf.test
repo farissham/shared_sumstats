@@ -23,4 +23,33 @@ nextflow_workflow {
             assert lines[0] == "rsid\tchr\tpos\tea\toa\teaf\tbeta\tse\tp\tn\tz"
         }
     }
+
+    test("auto-lifts a cross-build chr:pos input via a configured chain") {
+        // A GRCh38 chr:pos input with no rsid_map/chain of its own, plus a chain
+        // configured for GRCh38 -> the subworkflow runs LIFTOVER_PANEL once and
+        // feeds the generated map to the harmoniser, with no per-row wiring.
+        when {
+            params {
+                ld_ref_build    = "GRCh37"
+                liftover_chains = [ GRCh38: "${projectDir}/assets/test/lift_37to38.chain".toString() ]
+            }
+            workflow {
+                """
+                input[0] = Channel.of([
+                    [ id:'lift38', format:'gwama', n:9500, build:'GRCh38' ],
+                    file("${projectDir}/assets/test/gwama_lift_demo.tsv")
+                ])
+                input[1] = file("${projectDir}/assets/test/snp.info")
+                """
+            }
+        }
+        then {
+            assert workflow.success
+            assert workflow.out.harmonised.size() == 1
+            def data = path(workflow.out.harmonised[0][1]).linesGzip.findAll { it ==~ /^rs\d.*/ }
+            assert data.size() == 7                          // rs7 (chr7) not in panel -> dropped
+            def rs1 = data.find { it.startsWith("rs1\t") }.split("\t")
+            assert rs1[1] == "1" && rs1[2] == "1001"         // GRCh38 input resolved to panel coords
+        }
+    }
 }
