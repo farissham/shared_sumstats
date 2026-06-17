@@ -1,0 +1,8 @@
+submit_fp925.sh
+work/
+results*/
+*.o[0-9]*
+*.e[0-9]*
+.nextflow/
+.nextflow.log*
+.DS_Store
