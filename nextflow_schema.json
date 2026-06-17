@@ -79,7 +79,22 @@
                 },
                 "ld_ref_url": {
                     "type": "string",
-                    "description": "URL to download the LD reference archive when ld_ref_dir does not exist (7M profile only)."
+                    "description": "URL to download the LD reference archive when ld_ref_dir is absent (ld_mode='prebuilt')."
+                },
+                "ld_mode": {
+                    "type": "string",
+                    "enum": ["prebuilt", "build"],
+                    "default": "prebuilt",
+                    "description": "LD-reference resolution mode: 'prebuilt' uses a pre-staged ld_ref_dir (or downloads ld_ref_url); 'build' constructs eigen-LD + snp.info from a genotype panel via SBayesRC::LDstep."
+                },
+                "genotype": {
+                    "type": "string",
+                    "description": "PLINK genotype prefix (.bed/.bim/.fam). Builds the LD reference in ld_mode='build' and serves as SuSiE's per-locus LD panel."
+                },
+                "blocks_ref": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "LD-block definition (Block Chrom StartBP EndBP) for SBayesRC::LDstep when ld_mode='build'; defaults to the package GRCh37 blocks. Build must match the genotype's genome build."
                 },
                 "gwama_rsid_map": {
                     "type": "string",
@@ -126,6 +141,31 @@
                     "type": "string",
                     "format": "file-path",
                     "description": "HapMap3 SNP list (w_hm3.snplist) used by munge_sumstats.py --merge-alleles. Set by an SNP-set profile."
+                }
+            }
+        },
+        "susie_options": {
+            "title": "SuSiE options",
+            "type": "object",
+            "fa_icon": "fas fa-search-location",
+            "description": "Per-locus fine-mapping with SuSiE off the harmonised hub. Active when 'susie' is in --modules.",
+            "properties": {
+                "loci": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "CSV of loci to fine-map (columns: chr,start,end)."
+                },
+                "susie_l": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 1,
+                    "description": "Maximum number of causal variants (SuSiE L)."
+                },
+                "susie_max_iter": {
+                    "type": "integer",
+                    "default": 1000,
+                    "minimum": 1,
+                    "description": "Maximum SuSiE IBSS iterations."
                 }
             }
         },
@@ -249,6 +289,9 @@
         },
         {
             "$ref": "#/$defs/ldsc_options"
+        },
+        {
+            "$ref": "#/$defs/susie_options"
         },
         {
             "$ref": "#/$defs/institutional_config_options"

@@ -3,7 +3,9 @@
     IMPORT SUBWORKFLOWS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
-include { HARMONISE } from '../subworkflows/local/harmonise'
+include { PREPARE_REFERENCE } from '../subworkflows/local/prepare_reference'
+include { HARMONISE         } from '../subworkflows/local/harmonise'
+include { SBAYESRC          } from '../subworkflows/local/sbayesrc'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -16,14 +18,28 @@ workflow SUMSTATS {
     ch_samplesheet // channel: [ meta, sumstats ]
 
     main:
-    if (!params.ld_ref_dir) {
-        error "params.ld_ref_dir must be set (select an SNP-set profile, e.g. -profile hm3, or pass --ld_ref_dir)"
-    }
-    def ch_snp_info = channel.fromPath("${params.ld_ref_dir}/snp.info", checkIfExists: true).first()
+    ch_versions = Channel.empty()
 
-    HARMONISE(ch_samplesheet, ch_snp_info)
+    // Resolve the LD reference (Mode A 'prebuilt' | Mode B 'build'). snp_info gates
+    // HARMONISE; ld_dir/annot feed SBayesRC; genotype feeds SuSiE.
+    PREPARE_REFERENCE()
+    ch_versions = ch_versions.mix(PREPARE_REFERENCE.out.versions)
+
+    HARMONISE(ch_samplesheet, PREPARE_REFERENCE.out.snp_info)
+    ch_versions = ch_versions.mix(HARMONISE.out.versions)
+
+    // Analysis modules off the harmonised hub, gated by params.modules.
+    def mods = (params.modules ?: '').tokenize(',')*.trim()
+
+    ch_sbayesrc = Channel.empty()
+    if ('sbayesrc' in mods) {
+        SBAYESRC(HARMONISE.out.harmonised, PREPARE_REFERENCE.out.ld_dir, PREPARE_REFERENCE.out.annot)
+        ch_sbayesrc = SBAYESRC.out.results
+        ch_versions = ch_versions.mix(SBAYESRC.out.versions)
+    }
 
     emit:
     harmonised = HARMONISE.out.harmonised
-    versions   = HARMONISE.out.versions
+    sbayesrc   = ch_sbayesrc
+    versions   = ch_versions
 }

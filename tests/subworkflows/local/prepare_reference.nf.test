@@ -1,0 +1,26 @@
+nextflow_workflow {
+
+    name "Test PREPARE_REFERENCE subworkflow"
+    script "subworkflows/local/prepare_reference/main.nf"
+    workflow "PREPARE_REFERENCE"
+
+    test("prebuilt mode resolves snp.info from a pre-staged ld_ref_dir") {
+        when {
+            params {
+                ld_mode    = "prebuilt"
+                ld_ref_dir = "${projectDir}/assets/test"
+                annot_file = null
+                genotype   = null
+            }
+        }
+        then {
+            assert workflow.success
+            assert workflow.out.snp_info
+            assert file(workflow.out.snp_info[0]).name == "snp.info"
+            assert workflow.out.ld_dir
+            // no annot / no genotype configured -> empty placeholders
+            assert workflow.out.annot[0] == []
+            assert workflow.out.genotype[0] == []
+        }
+    }
+}

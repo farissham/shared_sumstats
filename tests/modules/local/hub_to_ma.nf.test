@@ -1,0 +1,27 @@
+nextflow_process {
+
+    name "Test HUB_TO_MA"
+    script "modules/local/hub_to_ma.nf"
+    process "HUB_TO_MA"
+
+    test("projects the harmonised hub into COJO .ma columns") {
+        when {
+            process {
+                """
+                input[0] = [ [ id:'demo' ], file("${projectDir}/assets/test/harmonised_demo.tsv.gz") ]
+                """
+            }
+        }
+        then {
+            assert process.success
+            def lines = path(process.out.ma[0][1]).readLines()
+            assert lines[0] == "SNP\tA1\tA2\tfreq\tb\tse\tp\tN"
+            assert lines.size() == 4                              // header + 3 SNPs
+            def rs1 = lines.find { it.startsWith("rs1\t") }.split("\t")
+            assert rs1[1] == "A" && rs1[2] == "G"                // A1=ea, A2=oa
+            assert rs1[3] == "0.31"                              // freq=eaf
+            assert rs1[4] == "0.025"                             // b=beta
+            assert rs1[7] == "10000"                             // N=n
+        }
+    }
+}
