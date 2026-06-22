@@ -6,6 +6,7 @@
 include { PREPARE_REFERENCE } from '../subworkflows/local/prepare_reference'
 include { HARMONISE         } from '../subworkflows/local/harmonise'
 include { SBAYESRC          } from '../subworkflows/local/sbayesrc'
+include { SUSIE_FINEMAP     } from '../subworkflows/local/susie'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -38,8 +39,19 @@ workflow SUMSTATS {
         ch_versions = ch_versions.mix(SBAYESRC.out.versions)
     }
 
+    ch_susie = Channel.empty()
+    if ('susie' in mods) {
+        if (!params.genotype || !params.loci) {
+            error "SUSIE: --genotype (PLINK prefix) and --loci (CSV: chr,start,end) are required for the 'susie' module"
+        }
+        SUSIE_FINEMAP(HARMONISE.out.harmonised, PREPARE_REFERENCE.out.genotype, file(params.loci, checkIfExists: true))
+        ch_susie    = SUSIE_FINEMAP.out.credible_sets
+        ch_versions = ch_versions.mix(SUSIE_FINEMAP.out.versions)
+    }
+
     emit:
     harmonised = HARMONISE.out.harmonised
     sbayesrc   = ch_sbayesrc
+    susie      = ch_susie
     versions   = ch_versions
 }

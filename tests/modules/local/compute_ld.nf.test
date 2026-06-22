@@ -1,0 +1,29 @@
+nextflow_process {
+
+    name "Test COMPUTE_LD"
+    script "modules/local/compute_ld.nf"
+    process "COMPUTE_LD"
+
+    test("computes a per-locus LD matrix + locus bim from a PLINK panel") {
+        when {
+            process {
+                """
+                input[0] = [ 1, 1000, 5000 ]
+                input[1] = file("${projectDir}/assets/test/susie/panel.bed")
+                input[2] = file("${projectDir}/assets/test/susie/panel.bim")
+                input[3] = file("${projectDir}/assets/test/susie/panel.fam")
+                """
+            }
+        }
+        then {
+            assert process.success
+            def ld  = path(process.out.ld[0][3]).readLines()
+            def bim = path(process.out.ld[0][4]).readLines()
+            // square matrix, one row per locus SNP; bim aligned to matrix order
+            assert bim.size() == ld.size()
+            assert ld.size() >= 2
+            // each LD row has the same number of columns as there are SNPs
+            assert ld[0].trim().split(/\s+/).size() == ld.size()
+        }
+    }
+}

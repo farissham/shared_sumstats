@@ -1,0 +1,39 @@
+nextflow_workflow {
+
+    name "Test SUSIE_FINEMAP subworkflow"
+    script "subworkflows/local/susie/main.nf"
+    workflow "SUSIE_FINEMAP"
+    config "tests/subworkflows/local/susie_align_only.config"
+
+    test("computes per-locus LD and fine-maps each trait (align stage)") {
+        // Exercises the full wiring: loci CSV -> COMPUTE_LD (plink) -> combine
+        // fan-out -> SUSIE. SUSIE runs in --align_only mode (no susieR), so it
+        // produces the alignment audit + a placeholder credible-sets file.
+        when {
+            workflow {
+                """
+                input[0] = Channel.of([
+                    [ id:'demo', n:9000 ],
+                    file("${projectDir}/assets/test/susie/hub_locus.tsv.gz")
+                ])
+                input[1] = Channel.of([
+                    file("${projectDir}/assets/test/susie/panel.bed"),
+                    file("${projectDir}/assets/test/susie/panel.bim"),
+                    file("${projectDir}/assets/test/susie/panel.fam")
+                ])
+                input[2] = file("${projectDir}/assets/test/susie/loci.csv")
+                """
+            }
+        }
+        then {
+            assert workflow.success
+            // one credible-sets file and one alignment audit for the single trait x locus
+            assert workflow.out.credible_sets.size() == 1
+            assert workflow.out.align.size() == 1
+            // the audit matched all four locus SNPs from the panel
+            def audit = path(workflow.out.align[0][1]).readLines()
+            assert audit[0] == "rsid\tchr\tpos\tea\toa\tA1\tA2\tmatch_type\taction\tz\tz_aln"
+            assert audit.findAll { it ==~ /^rs\d.*/ }.size() == 4
+        }
+    }
+}
