@@ -30,6 +30,8 @@ process COMPUTE_LD {
         --bfile ${prefix} \\
         --extract snps_${chr}_${start}_${end}.txt \\
         --r square \\
+        --ld-window 99999 \\
+        --ld-window-kb 99999 \\
         --out locus_${chr}_${start}_${end}
 
     cat <<-END_VERSIONS > versions.yml

@@ -6,7 +6,7 @@ process SUSIE {
     // (-profile conda) or an image that bundles r-susier + r-data.table +
     // r-optparse. TODO: pin/publish a SuSiE container and set it here.
     conda "conda-forge::r-susier=0.14.2 conda-forge::r-data.table conda-forge::r-optparse"
-    container 'ghcr.io/bernooi/gctb-sbayesrc:dev'
+    container 'ghcr.io/bernooi/susie:0.14.2'
 
     publishDir "${params.outdir}/susie", mode: params.publish_dir_mode
 
