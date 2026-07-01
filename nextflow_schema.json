@@ -169,6 +169,45 @@
                 }
             }
         },
+        "magma_options": {
+            "title": "MAGMA options",
+            "type": "object",
+            "fa_icon": "fas fa-dna",
+            "description": "Gene-based, gene-set, and tissue-specific enrichment analysis with MAGMA. Active when 'magma' is in --modules.",
+            "properties": {
+                "magma_gene_loc": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "NCBI gene location file (e.g. NCBI38.gene.loc). Required when 'magma' is in --modules."
+                },
+                "magma_gene_sets": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Gene-set file in .gmt format (e.g. MSigDB C5 GO gene sets). Omit to skip gene-set analysis."
+                },
+                "magma_gtex": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "GTEx tissue expression file with Entrez IDs (e.g. gtex_v8_ts_avg_log2TPM_entrez.txt). Omit to skip tissue-specific analysis."
+                },
+                "magma_window": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 0,
+                    "description": "Flanking window in kb around each gene body for SNP-to-gene annotation."
+                },
+                "magma_snp_col": {
+                    "type": "string",
+                    "default": "rsid",
+                    "description": "Column name for SNP ID in the harmonised hub. Default matches hub format; override for non-standard inputs."
+                },
+                "magma_p_col": {
+                    "type": "string",
+                    "default": "p",
+                    "description": "Column name for p-value in the harmonised hub. Default matches hub format; override for non-standard inputs."
+                }
+            }
+        },
         "institutional_config_options": {
             "title": "Institutional config options",
             "type": "object",
@@ -292,6 +331,9 @@
         },
         {
             "$ref": "#/$defs/susie_options"
+        },
+        {
+            "$ref": "#/$defs/magma_options"
         },
         {
             "$ref": "#/$defs/institutional_config_options"
