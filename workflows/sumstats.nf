@@ -6,6 +6,8 @@
 include { PREPARE_REFERENCE } from '../subworkflows/local/prepare_reference'
 include { HARMONISE         } from '../subworkflows/local/harmonise'
 include { SBAYESRC          } from '../subworkflows/local/sbayesrc'
+include { SUSIE_FINEMAP     } from '../subworkflows/local/susie'
+include { MAGMA             } from '../subworkflows/local/magma'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -38,8 +40,39 @@ workflow SUMSTATS {
         ch_versions = ch_versions.mix(SBAYESRC.out.versions)
     }
 
+    ch_susie = Channel.empty()
+    if ('susie' in mods) {
+        if (!params.genotype || !params.loci) {
+            error "SUSIE: --genotype (PLINK prefix) and --loci (CSV: chr,start,end) are required for the 'susie' module"
+        }
+        SUSIE_FINEMAP(HARMONISE.out.harmonised, PREPARE_REFERENCE.out.genotype, file(params.loci, checkIfExists: true))
+        ch_susie    = SUSIE_FINEMAP.out.credible_sets
+        ch_versions = ch_versions.mix(SUSIE_FINEMAP.out.versions)
+    }
+
+    ch_magma_genes      = Channel.empty()
+    ch_magma_geneset    = Channel.empty()
+    ch_magma_tissue     = Channel.empty()
+    if ('magma' in mods) {
+        if (!params.genotype || !params.magma_gene_loc) {
+            error "MAGMA: --genotype (PLINK prefix) and --magma_gene_loc are required for the 'magma' module"
+        }
+        def gene_loc_ch  = file(params.magma_gene_loc,  checkIfExists: true)
+        def gene_sets_ch = params.magma_gene_sets ? file(params.magma_gene_sets, checkIfExists: true) : []
+        def gtex_ch      = params.magma_gtex      ? file(params.magma_gtex,      checkIfExists: true) : []
+        MAGMA(HARMONISE.out.harmonised, PREPARE_REFERENCE.out.genotype, gene_loc_ch, gene_sets_ch, gtex_ch)
+        ch_magma_genes   = MAGMA.out.genes_out
+        ch_magma_geneset = MAGMA.out.geneset_out
+        ch_magma_tissue  = MAGMA.out.tissue_out
+        ch_versions      = ch_versions.mix(MAGMA.out.versions)
+    }
+
     emit:
-    harmonised = HARMONISE.out.harmonised
-    sbayesrc   = ch_sbayesrc
-    versions   = ch_versions
+    harmonised     = HARMONISE.out.harmonised
+    sbayesrc       = ch_sbayesrc
+    susie          = ch_susie
+    magma_genes    = ch_magma_genes
+    magma_geneset  = ch_magma_geneset
+    magma_tissue   = ch_magma_tissue
+    versions       = ch_versions
 }

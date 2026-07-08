@@ -106,16 +106,109 @@ Out of scope (later project phases): LDSC (Phase 4), report assembler (Phase 5),
 
 ---
 
-## Stage 2 — SuSiE subworkflow (port + the part-1 fixes)
+## Stage 2 — SuSiE fine-mapping (port + the part-1 allele re-alignment)
 
-**Files:** `bin/susie.R` 🆕, `modules/local/compute_ld.nf` 🆕, `modules/local/susie.nf` 🆕, `subworkflows/local/susie/main.nf` 🆕, params `loci`/`susie_l`/`susie_max_iter` (Task 1.1), fixtures (tiny PLINK panel + `loci.csv`), tests.
+> **Status (2026-06-22): ✅ ported, retargeted, join built.** `bin/susie.R` reads the hub and does the rsID-primary + chr:pos-fallback join with allele re-alignment (keep/flip/drop) — verified for real in the engine container (rs1 keep, rs2 flip→−z, rs3 via pos-fallback, rs4 palindrome-drop). `COMPUTE_LD` (plink biocontainer) + `SUSIE` (susieR via conda) modules, the `SUSIE_FINEMAP` subworkflow, and the `--modules susie` gate in `sumstats.nf` are wired and tested — **17 nf-tests green** incl. `compute_ld` and a `susie` subworkflow integration test (`--align_only`). **Remaining:** (a) the real `susie_rss` execution needs a susieR env (conda-forge `r-susier`) — wired but not yet run end-to-end (analogous to SBayesRC's real-run gap); (b) README SuSiE section; (c) decide whether to retire Faris's standalone `susie_pipeline/` (collaborator's committed dir — confirm before removing).
 
-- [ ] `COMPUTE_LD`: `plink --r square` per locus from `params.genotype` → `R` + SNP list. PLINK biocontainer.
-- [ ] `bin/susie.R` (port of `/tmp/susie_pipeline/scripts/susie.R`), changes: read **hub** columns (`rsid/pos/beta/p/n`, reuse hub `z`); **re-align z to the LD panel `.bim`** (flip where panel A1 = hub `oa`; complement strand; resolve/drop palindromes); honour `--max_iter`; **per-locus resilience** (exit 0 + note on empty/failed locus, never kill the run).
-- [ ] `SUSIE` module + subworkflow (`take: ch_harmonised, genotype, loci`): split loci → `COMPUTE_LD` → `SUSIE` → collect credible sets + PIP plots; `emit: credible_sets, versions`.
-- [ ] R container with `susieR`+`data.table`+`optparse` (add to the engine image or use a biocontainer).
-- [ ] Gate in `SUMSTATS`: `if ('susie' in mods) SUSIE(HARMONISE.out.harmonised, PREPARE_REFERENCE.out.genotype, ch_loci)`.
-- [ ] Tests: `COMPUTE_LD` (tiny panel), `bin/susie.R` re-alignment unit (incl. a deliberate flip + a palindrome drop), subworkflow.
+**Stage goal:** an opt-in `susie` module that fine-maps the harmonised hub per locus → credible sets + PIP, adding the per-SNP allele re-alignment to the LD panel that the prototype lacks. Unlike SBayesRC, all of this is unit-testable on tiny fixtures.
+
+**Per-trait × per-locus data flow:**
+```
+ hub --subset locus--> z,ea,oa,eaf (snp.info coding)
+ genotype panel --COMPUTE_LD (plink --r)--> R matrix + locus .bim (panel coding)
+        -> bin/susie.R: intersect by rsid -> RE-ALIGN z to .bim -> susie_rss -> credible sets + PIP
+```
+
+### Task 2.0: Containers (prerequisite)
+
+- [ ] **PLINK** for `COMPUTE_LD`: pin a biocontainer, e.g. `quay.io/biocontainers/plink:1.90b6.21--h779adbc_1`.
+- [ ] **R + susieR** for `bin/susie.R`: needs `susieR` + `data.table` + `optparse`. Either (a) build a Wave/mulled biocontainer of the three, or (b) add `susieR` to `ghcr.io/bernooi/gctb-sbayesrc:dev` and re-push. Pin the chosen image; every SuSiE R step uses it.
+- [ ] **Verify:** `docker run --rm <image> Rscript -e 'library(susieR); library(data.table); library(optparse)'` exits 0.
+
+### Task 2.1: Fixtures (tiny panel + loci + hand-made LD/bim/hub for the R-only test)
+
+**Files:** `assets/test/susie/loci.csv` 🆕, `assets/test/susie/panel.{bed,bim,fam}` 🆕, `assets/test/susie/locus.ld` 🆕, `assets/test/susie/locus.bim` 🆕, `assets/test/susie/hub_locus.tsv.gz` 🆕
+
+- [ ] **Step 1: `loci.csv`** — `chr,start,end` covering the chr1 fixture SNPs, e.g. `1,1000,5000`.
+- [ ] **Step 2: tiny PLINK panel** — hand-write a small text VCF (~60 synthetic samples; SNPs `rs1..rs4` on chr1 at the snp.info positions, with some correlation), then in the PLINK container: `plink --vcf panel.vcf --make-bed --out assets/test/susie/panel`. **Deliberately set the `.bim` A1/A2 so `rs2` is swapped vs the hub and `rs4` is a palindrome** (so COMPUTE_LD + alignment have something to exercise).
+- [ ] **Step 3: hand-made unit fixtures for `bin/susie.R`** (no PLINK needed): a 4×4 whitespace `locus.ld`, a matching `locus.bim` (`chr rsid cm pos A1 A2` for `rs1..rs4`, with `rs2` swapped and `rs4` palindromic), and `hub_locus.tsv.gz` (hub columns for `rs1..rs4`, `ea/oa` matching the *unswapped* orientation so the test produces one keep, one flip, one palindrome-drop).
+- [ ] **Verify:** `wc -l assets/test/susie/panel.bim` = 4; `gunzip -c .../hub_locus.tsv.gz | head`.
+- [ ] **Commit.**
+
+### Task 2.2: `bin/susie.R` — hub remap + re-alignment + resilience (TDD)
+
+**Files:** `bin/susie.R` 🆕, `tests/modules/local/susie.nf.test` 🆕 (added in Task 2.4) — for now drive a **script-level** check.
+
+**CLI:** `--hub --ld --bim --chr --start --end --n --l --max_iter --out_cs --out_plot --out_align`
+
+- [ ] **Step 1: write the alignment audit-driven test first** (script-level, runnable in the susieR container): run `susie.R` on the Task 2.1 hand-made fixtures; assert `out_align` shows `rs1=keep`, `rs2=flip`, `rs4=drop`, and that `out_cs` exists.
+- [ ] **Step 2: implement `bin/susie.R`.** Logic:
+  1. read hub (gz) → subset to the locus by `chr` & `pos`;
+  2. read `.ld` (matrix) and `.bim` (panel SNP order + `A1`/`A2`);
+  3. intersect hub ∩ panel by `rsid`, order rows/cols to `.bim`;
+  4. **re-align z onto the panel coding** (the crux):
+     ```r
+     comp <- function(x) chartr("ACGTacgt", "TGCAtgca", x)
+     m[, action := fcase(
+         ea == A1 & oa == A2,             "keep",
+         ea == A2 & oa == A1,             "flip",
+         comp(ea) == A1 & comp(oa) == A2, "keep",   # reverse strand
+         comp(ea) == A2 & comp(oa) == A1, "flip",   # reverse strand, swapped
+         default = "drop")]
+     m[ea == comp(oa), action := "drop"]            # palindrome: strand unknowable -> drop (v1)
+     m <- m[action != "drop"]
+     m[, z_aln := fifelse(action == "flip", -z, z)]
+     ```
+     Write the per-SNP audit (`rsid, ea, oa, A1, A2, action, z, z_aln`) to `--out_align`.
+  5. `susie_rss(z = m$z_aln, R = R[idx, idx], n = max(m$n), L = opt$l, max_iter = opt$max_iter)`;
+  6. write credible sets (`--out_cs`) + PIP plot (`--out_plot`);
+  7. **per-locus resilience:** if 0 common SNPs or `susie_rss` errors, write a one-line note to `--out_cs` and **`quit(status = 0)`** (never kill the run).
+- [ ] **Step 3: verify** the script-level test passes (flip negates `z`, palindrome dropped, CS produced). **Commit.**
+
+> v1 **drops** palindromes (conservative — a wrong sign is worse than a drop). Resolving them by frequency (`plink --freq` panel MAF vs hub `eaf`) is a later refinement; note it in the README.
+
+### Task 2.3: `COMPUTE_LD` module (TDD)
+
+**Files:** `modules/local/compute_ld.nf` 🆕, `tests/modules/local/compute_ld.nf.test` 🆕
+
+- [ ] **Process** (PLINK container), input `tuple(val(locus), path(bed), path(bim), path(fam))` where `locus=[chr,start,end]`; script:
+  ```bash
+  awk -v c=${chr} -v s=${start} -v e=${end} '$1==c && $4>=s && $4<=e {print $2}' ${bim} > snps.txt
+  plink --bfile ${bed.baseName} --extract snps.txt --r square --out locus_${chr}_${start}_${end}
+  plink --bfile ${bed.baseName} --extract snps.txt --make-just-bim --out locus_${chr}_${start}_${end}
+  ```
+  output `tuple(val(locus), path("*.ld"), path("locus_*.bim")), emit: ld` + `versions.yml`. (`--make-just-bim` gives the panel alleles in matrix order for alignment.)
+- [ ] **Test:** run on the panel fixture for `1,1000,5000`; assert the `.ld` has N rows = #SNPs in window and a `.bim` is emitted. **Commit.**
+
+### Task 2.4: `SUSIE` module (TDD)
+
+**Files:** `modules/local/susie.nf` 🆕, `tests/modules/local/susie.nf.test` 🆕
+
+- [ ] Wrap `bin/susie.R` (susieR container). Input `tuple(val(meta), path(hub), val(locus), path(ld), path(bim))`; pass `--l ${params.susie_l} --max_iter ${params.susie_max_iter} --n ${meta.n}`. Output `tuple(val(meta), path("*credible_sets*.csv")), emit: credible_sets` + plot + align + `versions.yml`.
+- [ ] **Test:** feed `[meta, hub_locus.tsv.gz, [1,1000,5000], locus.ld, locus.bim]`; assert credible-sets CSV and that the align audit marks the flip + drop. **Commit.**
+
+### Task 2.5: `susie` subworkflow + wire into `SUMSTATS` (TDD)
+
+**Files:** `subworkflows/local/susie/main.nf` 🆕, `workflows/sumstats.nf` ✏️, `tests/subworkflows/local/susie.nf.test` 🆕
+
+- [ ] **Subworkflow** (`take: ch_harmonised, genotype, loci_csv`):
+  ```groovy
+  ch_loci = Channel.fromPath(loci_csv).splitCsv(header:true)
+      .map { row -> [ [row.chr as int, row.start as int, row.end as int] ] }
+  COMPUTE_LD(ch_loci.combine(genotype))            // genotype = staged bed/bim/fam
+  // fan loci LD across every trait:
+  ch_in = ch_harmonised.combine(COMPUTE_LD.out.ld) // [meta, hub, locus, ld, bim]
+      .map { meta, hub, locus, ld, bim -> [ meta, hub, locus, ld, bim ] }
+  SUSIE(ch_in)
+  emit: credible_sets = SUSIE.out.credible_sets; versions = ...
+  ```
+- [ ] **Wire** in `SUMSTATS`: `if ('susie' in mods) { if(!params.loci||!params.genotype) error '...'; SUSIE_SWF(HARMONISE.out.harmonised, PREPARE_REFERENCE.out.genotype, file(params.loci)) }`; mix versions; add a `susie` emit.
+- [ ] **Test:** subworkflow on the panel + loci fixtures → one credible-sets file for the locus. **Commit.**
+
+### Task 2.6: Docs + Definition of Done
+
+- [ ] README: SuSiE section (inputs `--genotype` + `--loci`; Mode-A vs Mode-B alignment; the palindrome-drop + LD-vs-GWAS-sample caveats).
+- [ ] Plan status banner; **DoD:** `--modules susie` yields per-locus credible sets on the fixtures; the alignment unit proves `keep/flip/drop`; per-locus resilience proven (an empty locus does not fail the run); all new nf-tests green.
 
 ---
 
