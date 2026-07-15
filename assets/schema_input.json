@@ -22,9 +22,9 @@
             },
             "format": {
                 "type": "string",
-                "enum": ["gwas-ssf", "gwama", "hail", "cvdkp"],
+                "enum": ["gwas-ssf", "gwama", "hail", "hail_step3", "cvdkp"],
                 "default": "gwas-ssf",
-                "errorMessage": "Format must be one of: gwas-ssf, gwama, hail, cvdkp",
+                "errorMessage": "Format must be one of: gwas-ssf, gwama, hail, hail_step3, cvdkp",
                 "meta": ["format"]
             },
             "n": {

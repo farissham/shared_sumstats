@@ -13,7 +13,7 @@ suppressPackageStartupMessages({ library(data.table); library(optparse) })
 
 opt <- parse_args(OptionParser(option_list = list(
     make_option("--input",       type = "character"),
-    make_option("--format",      type = "character", help = "gwas-ssf | gwama | hail | cvdkp"),
+    make_option("--format",      type = "character", help = "gwas-ssf | gwama | hail | hail_step3 | cvdkp"),
     make_option("--snp_info",    type = "character", help = "LD reference snp.info"),
     make_option("--rsid_map",    type = "character", default = NA,
                 help = "Optional chr,pos,rsid map (must match the input build) for chr:pos markers."),
@@ -128,6 +128,20 @@ parse_hail <- function(d) {
                p = as.numeric(d$p_value), n_row = NA_real_)
 }
 
+parse_hail_step3 <- function(d) {
+    # hail_gwas step3 export: separate CHR/POS/REF/ALT (not combined locus/alleles),
+    # and a chi_sq_stat instead of standard_error - se is recovered via the Wald
+    # relationship chi_sq = (beta/se)^2, so se = |beta| / sqrt(chi_sq_stat).
+    need(d, c("CHR", "POS", "REF", "ALT", "ALT_AF", "beta", "chi_sq_stat", "p_value"))
+    chr   <- sub("^chr", "", as.character(d$CHR))
+    se    <- abs(as.numeric(d$beta)) / sqrt(as.numeric(d$chi_sq_stat))
+    n_row <- if ("N" %in% names(d)) as.numeric(d$N) else NA_real_
+    data.table(marker = paste0(chr, ":", d$POS), ea_in = d$ALT, oa_in = d$REF,
+               eaf_in = suppressWarnings(as.numeric(d$ALT_AF)),
+               beta = as.numeric(d$beta), se = se,
+               p = as.numeric(d$p_value), n_row = n_row)
+}
+
 parse_cvdkp <- function(d) {
     fc <- function(p, req = TRUE) { m <- grep(p, names(d), ignore.case = TRUE, value = TRUE, perl = TRUE)
         if (!length(m)) { if (req) stop("[cvdkp] missing column matching: ", p); return(NA_character_) }; m[1] }
@@ -146,8 +160,9 @@ parse_cvdkp <- function(d) {
 
 dt <- read_any(opt$input)
 s  <- switch(opt$format,
-    "gwas-ssf" = parse_gwas_ssf(dt), "gwama" = parse_gwama(dt),
-    "hail"     = parse_hail(dt),     "cvdkp" = parse_cvdkp(dt),
+    "gwas-ssf" = parse_gwas_ssf(dt),   "gwama" = parse_gwama(dt),
+    "hail"     = parse_hail(dt),       "cvdkp" = parse_cvdkp(dt),
+    "hail_step3" = parse_hail_step3(dt),
     stop("Unknown --format: ", opt$format))
 
 # read panel up front: used by both the build matcher and the final rsID join
