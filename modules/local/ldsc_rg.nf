@@ -1,6 +1,6 @@
 process LDSC_RG {
     label 'process_medium'
-    container 'ghcr.io/farissham/ldsc:dev'
+    container 'ghcr.io/farissham/ldsc:1.0.1'
 
     input:
     path sumstats   // list of [meta.id].munge.sumstats.gz — unique basenames, no staging collision

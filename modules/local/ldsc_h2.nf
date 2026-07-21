@@ -1,7 +1,7 @@
 process LDSC_H2 {
     tag "$meta.id"
     label 'process_medium'
-    container 'ghcr.io/farissham/ldsc:dev'
+    container 'ghcr.io/farissham/ldsc:1.0.1'
 
     input:
     tuple val(meta), path(sumstats)
