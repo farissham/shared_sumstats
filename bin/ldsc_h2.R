@@ -21,6 +21,10 @@ opt <- parse_args(OptionParser(option_list = list(
     make_option("--sumstats",    type = "character", help = "Munged sumstats (munge_sumstats.py output, .sumstats.gz)"),
     make_option("--ld_dir",      type = "character", help = "Directory of LDSC LD scores (eur_w_ld_chr: per-chromosome .l2.ldscore.gz + .l2.M_5_50)"),
     make_option("--id",          type = "character", help = "Trait id, written to the output and used as the ldsc.py --out prefix"),
+    make_option("--samp_prev",   type = "double", default = NA_real_,
+                help = "Case fraction in the GWAS sample. Supply together with --pop_prev to also report liability-scale h2 (binary traits only)."),
+    make_option("--pop_prev",    type = "double", default = NA_real_,
+                help = "Population prevalence of the trait. Supply together with --samp_prev."),
     make_option("--out_summary", type = "character", help = "Output TSV: one row of h2 + diagnostics")
 )))
 
@@ -29,6 +33,7 @@ note_exit <- function(msg) {
     cat("[ldsc_h2]", opt$id, "NOTE:", msg, "\n")
     fwrite(data.table(id = opt$id,
                        h2 = NA_real_, h2_se = NA_real_,
+                       liability_h2 = NA_real_, liability_h2_se = NA_real_,
                        lambda_gc = NA_real_, mean_chi2 = NA_real_,
                        intercept = NA_real_, intercept_se = NA_real_,
                        ratio = NA_real_, ratio_se = NA_real_,
@@ -58,10 +63,14 @@ prefix   <- paste0(opt$id, ".h2")
 ld_ref   <- paste0(opt$ld_dir, "/")
 log_file <- paste0(prefix, ".log")
 
+liability_requested <- !is.na(opt$samp_prev) && !is.na(opt$pop_prev)
+prev_args <- if (liability_requested) c("--samp-prev", opt$samp_prev, "--pop-prev", opt$pop_prev) else character(0)
+
 status <- system2("ldsc.py",
     c("--h2", opt$sumstats,
       "--ref-ld-chr", ld_ref,
       "--w-ld-chr",   ld_ref,
+      prev_args,
       "--out", prefix),
     stdout = TRUE, stderr = TRUE)
 
@@ -76,7 +85,8 @@ if (length(grep("ERROR", log_lines)) > 0) {
 }
 
 ## ---- parse the log -------------------------------------------------------------
-h2        <- val_se(log_lines, "^Total Observed scale h2:")
+h2           <- val_se(log_lines, "^Total Observed scale h2:")
+liability_h2 <- if (liability_requested) val_se(log_lines, "^Total Liability scale h2:") else c(NA_real_, NA_real_)
 lambda_gc <- val_only(log_lines, "^Lambda GC:")
 mean_chi2 <- val_only(log_lines, "^Mean Chi\\^2:")
 intercept <- val_se(log_lines, "^Intercept:")
@@ -98,11 +108,12 @@ if (length(ratio_line) == 0) {
 ## ---- write output ---------------------------------------------------------------
 fwrite(data.table(id = opt$id,
                    h2 = h2[1], h2_se = h2[2],
+                   liability_h2 = liability_h2[1], liability_h2_se = liability_h2[2],
                    lambda_gc = lambda_gc, mean_chi2 = mean_chi2,
                    intercept = intercept[1], intercept_se = intercept[2],
                    ratio = ratio[1], ratio_se = ratio[2],
                    note = ratio_note),
        opt$out_summary, sep = "\t")
 
-cat(sprintf("[ldsc_h2] %s  h2=%.4f (%.4f)  intercept=%.4f (%.4f)\n",
-            opt$id, h2[1], h2[2], intercept[1], intercept[2]))
+cat(sprintf("[ldsc_h2] %s  h2=%.4f (%.4f)  liability_h2=%.4f (%.4f)  intercept=%.4f (%.4f)\n",
+            opt$id, h2[1], h2[2], liability_h2[1], liability_h2[2], intercept[1], intercept[2]))
