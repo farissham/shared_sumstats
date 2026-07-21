@@ -8,6 +8,7 @@ include { HARMONISE         } from '../subworkflows/local/harmonise'
 include { SBAYESRC          } from '../subworkflows/local/sbayesrc'
 include { SUSIE_FINEMAP     } from '../subworkflows/local/susie'
 include { MAGMA             } from '../subworkflows/local/magma'
+include { LDSC              } from '../subworkflows/local/ldsc'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -67,6 +68,20 @@ workflow SUMSTATS {
         ch_versions      = ch_versions.mix(MAGMA.out.versions)
     }
 
+    ch_ldsc_h2 = Channel.empty()
+    ch_ldsc_rg = Channel.empty()
+    if ('ldsc' in mods) {
+        if (!params.ldsc_ld_dir || !params.ldsc_snplist) {
+            error "LDSC: --ldsc_ld_dir and --ldsc_snplist are required for the 'ldsc' module"
+        }
+        LDSC(HARMONISE.out.harmonised,
+             file(params.ldsc_ld_dir, checkIfExists: true),
+             file(params.ldsc_snplist, checkIfExists: true))
+        ch_ldsc_h2  = LDSC.out.h2
+        ch_ldsc_rg  = LDSC.out.rg
+        ch_versions = ch_versions.mix(LDSC.out.versions)
+    }
+
     emit:
     harmonised     = HARMONISE.out.harmonised
     sbayesrc       = ch_sbayesrc
@@ -74,5 +89,7 @@ workflow SUMSTATS {
     magma_genes    = ch_magma_genes
     magma_geneset  = ch_magma_geneset
     magma_tissue   = ch_magma_tissue
+    ldsc_h2        = ch_ldsc_h2
+    ldsc_rg        = ch_ldsc_rg
     versions       = ch_versions
 }
