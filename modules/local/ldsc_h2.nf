@@ -9,7 +9,9 @@ process LDSC_H2 {
 
     output:
     tuple val(meta), path("${meta.id}.h2.tsv"), emit: summary
-    path "${meta.id}.h2.log",                   emit: log
+    // optional: note_exit() can return before ldsc.py ever runs (e.g. it produced
+    // no log at all), in which case this file never gets created.
+    path "${meta.id}.h2.log",                   emit: log, optional: true
     path "versions.yml",                        emit: versions
 
     script:

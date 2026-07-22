@@ -9,7 +9,9 @@ process LDSC_RG {
 
     output:
     path "cohort.rg_all_pairs.tsv", emit: summary
-    path "cohort.rg.log",           emit: log
+    // optional: note_exit() (e.g. <2 traits, or ldsc.py produced no log) returns
+    // before/without a real ldsc.py --rg run, so this file may never get created.
+    path "cohort.rg.log",           emit: log, optional: true
     path "versions.yml",            emit: versions
 
     script:
