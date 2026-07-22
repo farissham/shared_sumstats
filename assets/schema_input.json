@@ -52,6 +52,13 @@
                 "errorMessage": "Population prevalence (pop_prev) must be a number between 0 and 1; leave blank for quantitative traits",
                 "meta": ["pop_prev"]
             },
+            "samp_prev": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "errorMessage": "Sample prevalence (samp_prev) must be a number between 0 and 1; leave blank for quantitative traits. Case fraction in this trait's own GWAS sample -- pair with pop_prev for LDSC liability-scale h2.",
+                "meta": ["samp_prev"]
+            },
             "build": {
                 "type": "string",
                 "enum": ["GRCh37", "GRCh38"],

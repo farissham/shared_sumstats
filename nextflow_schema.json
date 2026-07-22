@@ -141,12 +141,6 @@
                     "type": "string",
                     "format": "file-path",
                     "description": "HapMap3 SNP list (w_hm3.snplist) used by munge_sumstats.py --merge-alleles. Set by an SNP-set profile."
-                },
-                "ldsc_samp_prev": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 1,
-                    "description": "Case fraction in the GWAS sample (binary traits only). Supply together with the samplesheet's per-trait pop_prev column to also report liability-scale h2; omit for quantitative traits or to skip the liability-scale conversion."
                 }
             }
         },
