@@ -9,7 +9,7 @@ process LDSC_RG {
 
     output:
     path "cohort.rg_all_pairs.tsv", emit: summary
-    path "cohort.rg.log",           emit: log
+    path "cohort.rg.log",           emit: log, optional: true
     path "versions.yml",            emit: versions
 
     script:
