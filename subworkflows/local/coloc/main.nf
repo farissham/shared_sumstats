@@ -5,10 +5,10 @@
 // Four ref modes (checked in order):
 //   1. coloc_ref_dir              : pre-filtered per-gene *.txt files (fastest)
 //   2. coloc_ref + coloc_genes    : full eQTL + explicit gene list → filter in pipeline
-//   3. coloc_ref + auto_genes=true: full eQTL → genes auto-discovered per locus
+//   3. coloc_ref + auto_genes=true: full eQTL → genes auto-discovered per locus;
+//                                   each gene is tested only at its discovered locus
+//                                   (not fanned across all loci)
 //   4. coloc_ref (alone)          : single gene file (backward-compat)
-//
-// Fan: every trait × every locus × every gene ref → one coloc.abf() job.
 //
 
 include { DISCOVER_GENES_IN_LOCUS } from '../../../modules/local/discover_genes_in_locus'
@@ -39,72 +39,95 @@ workflow COLOC_ANALYSIS {
         }
 
     // -------------------------------------------------------------------------
-    // Build ch_refs: [ gene_id, ref_path ]
+    // Build ch_coloc_in per ref mode
     // -------------------------------------------------------------------------
+    def ch_coloc_in
+
     if (coloc_ref_dir) {
-        // Mode 1: pre-filtered files already in a directory
-        ch_refs = Channel.fromPath("${coloc_ref_dir}/*.txt", checkIfExists: true)
+        // Mode 1: pre-filtered files already in a directory → fan gene × all loci
+        def ch_refs = Channel.fromPath("${coloc_ref_dir}/*.txt", checkIfExists: true)
             .map { f -> [ f.baseName, f ] }
 
-    } else if (params.coloc_auto_genes) {
-        // Mode 3: scan each locus in the full eQTL to discover relevant genes
-        ch_eqtl = Channel.fromPath(coloc_ref, checkIfExists: true).first()
+        ch_coloc_in = ch_harmonised
+            .combine(ch_refs)
+            .flatMap { meta, hub, gene_id, ref ->
+                loci_rows.collect { locus ->
+                    [ meta, gene_id, hub, locus[0], locus[1], locus[2], ref ]
+                }
+            }
 
-        // 3-way combine: trait × locus × eQTL (value channel → same file for all)
+    } else if (params.coloc_auto_genes) {
+        // Mode 3: discover genes per locus, COLOC only at the discovered locus.
+        // Preserves (gene, locus) pairing so genes are not fanned across all loci.
+        def ch_eqtl   = Channel.fromPath(coloc_ref, checkIfExists: true).first()
         def eqtl_path = file(coloc_ref.toString(), checkIfExists: true)
-        ch_discovery_in = ch_harmonised
+
+        def ch_discovery_in = ch_harmonised
             .map { meta, hub -> meta }
             .flatMap { meta ->
                 loci_rows.collect { locus -> [ meta, locus[0], locus[1], locus[2], eqtl_path ] }
             }
-            .combine(ch_eqtl)
-            .map { meta, chr, start, end, eqtl -> [ meta, chr, start, end, eqtl ] }
 
         DISCOVER_GENES_IN_LOCUS(ch_discovery_in)
         ch_versions = ch_versions.mix(DISCOVER_GENES_IN_LOCUS.out.versions.first())
 
-        // Collect gene lists from every trait×locus, dedup globally, then filter
-        ch_unique_genes = DISCOVER_GENES_IN_LOCUS.out.gene_list
-            .map { meta, chr, start, end, f -> f }
-            .collect()
-            .flatMap { files ->
-                files
-                    .collectMany { f -> f.readLines().collect { it.trim() }.findAll { it } }
-                    .unique()
-                    .sort()
+        // Flatten to (meta, gene, chr, start, end) — keeps locus info per gene
+        def ch_gene_locus = DISCOVER_GENES_IN_LOCUS.out.gene_list
+            .flatMap { meta, chr, start, end, f ->
+                f.readLines().collect { it.trim() }.findAll { it }
+                    .collect { gene -> [ meta, gene, chr, start, end ] }
             }
 
+        // FILTER runs once per unique gene name (same eQTL file for all traits/loci)
+        def ch_unique_genes = ch_gene_locus
+            .map  { meta, gene, chr, start, end -> gene }
+            .unique()
+
         FILTER_EQTL_GENE(ch_unique_genes, ch_eqtl)
-        ch_refs     = FILTER_EQTL_GENE.out.filtered
         ch_versions = ch_versions.mix(FILTER_EQTL_GENE.out.versions.first())
 
+        // Join gene-locus pairs → filtered refs → harmonised hub
+        ch_coloc_in = ch_gene_locus
+            .map    { meta, gene, chr, start, end -> [ gene, meta, chr, start, end ] }
+            .combine(FILTER_EQTL_GENE.out.filtered, by: [0])
+            .map    { gene, meta, chr, start, end, ref -> [ meta, gene, chr, start, end, ref ] }
+            .combine(ch_harmonised, by: [0])
+            .map    { meta, gene, chr, start, end, ref, hub ->
+                [ meta, gene, hub, chr, start, end, ref ]
+            }
+
     } else if (coloc_genes) {
-        // Mode 2: explicit gene list → filter full eQTL per gene
-        ch_eqtl  = Channel.fromPath(coloc_ref, checkIfExists: true).first()
-        ch_genes = Channel.fromPath(coloc_genes, checkIfExists: true)
+        // Mode 2: explicit gene list → filter full eQTL per gene, fan to all loci
+        def ch_eqtl  = Channel.fromPath(coloc_ref, checkIfExists: true).first()
+        def ch_genes = Channel.fromPath(coloc_genes, checkIfExists: true)
             .splitText()
             .map  { it.trim() }
             .filter { it && !it.startsWith('#') }
 
         FILTER_EQTL_GENE(ch_genes, ch_eqtl)
-        ch_refs     = FILTER_EQTL_GENE.out.filtered
         ch_versions = ch_versions.mix(FILTER_EQTL_GENE.out.versions.first())
 
-    } else {
-        // Mode 4: single pre-filtered gene file (backward-compatible)
-        ch_refs = Channel.fromPath(coloc_ref, checkIfExists: true)
-            .map { f -> [ f.baseName, f ] }
-    }
-
-    // 3-way fan: trait × locus × gene_ref → one COLOC job per triple.
-    // loci_rows is a plain Groovy list in the closure — no channel spreading.
-    ch_coloc_in = ch_harmonised
-        .combine(ch_refs)
-        .flatMap { meta, hub, gene_id, ref ->
-            loci_rows.collect { locus ->
-                [ meta, gene_id, hub, locus[0], locus[1], locus[2], ref ]
+        ch_coloc_in = ch_harmonised
+            .combine(FILTER_EQTL_GENE.out.filtered)
+            .flatMap { meta, hub, gene_id, ref ->
+                loci_rows.collect { locus ->
+                    [ meta, gene_id, hub, locus[0], locus[1], locus[2], ref ]
+                }
             }
-        }
+
+    } else {
+        // Mode 4: single pre-filtered gene file (backward-compatible) → fan to all loci
+        def ch_refs = Channel.fromPath(coloc_ref, checkIfExists: true)
+            .map { f -> [ f.baseName, f ] }
+
+        ch_coloc_in = ch_harmonised
+            .combine(ch_refs)
+            .flatMap { meta, hub, gene_id, ref ->
+                loci_rows.collect { locus ->
+                    [ meta, gene_id, hub, locus[0], locus[1], locus[2], ref ]
+                }
+            }
+    }
 
     COLOC(ch_coloc_in)
     ch_versions = ch_versions.mix(COLOC.out.versions)
