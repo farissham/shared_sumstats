@@ -264,9 +264,19 @@ result <- tryCatch(
 )
 
 ## ---- write outputs ----------------------------------------------------------
-smry <- as.data.table(as.list(result$summary))
-smry[, c("gene_id", "chr", "start", "end", "note") :=
-         .(if (!is.null(opt$gene_id)) opt$gene_id else "", opt$chr, opt$start, opt$end, "")]
+smry <- data.table(
+    gene_id   = if (!is.null(opt$gene_id)) opt$gene_id else "",
+    chr       = opt$chr,
+    start     = opt$start,
+    end       = opt$end,
+    nsnps     = as.numeric(result$summary[["nsnps"]]),
+    PP.H0.abf = result$summary[["PP.H0.abf"]],
+    PP.H1.abf = result$summary[["PP.H1.abf"]],
+    PP.H2.abf = result$summary[["PP.H2.abf"]],
+    PP.H3.abf = result$summary[["PP.H3.abf"]],
+    PP.H4.abf = result$summary[["PP.H4.abf"]],
+    note      = ""
+)
 fwrite(smry, opt$out_summary, sep = "\t")
 
 fwrite(as.data.table(result$results[, c("snp", "SNP.PP.H4")]), opt$out_snps, sep = "\t")
