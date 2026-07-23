@@ -1,0 +1,32 @@
+process LDSC_RG {
+    label 'process_medium'
+    container 'ghcr.io/farissham/ldsc:1.0.1'
+
+    input:
+    path sumstats   // list of [meta.id].munge.sumstats.gz — unique basenames, no staging collision
+    val  ids
+    path ld_dir, stageAs: 'ld_ref'
+
+    output:
+    path "cohort.rg_all_pairs.tsv", emit: summary
+    // optional: note_exit() (e.g. <2 traits, or ldsc.py produced no log) returns
+    // before/without a real ldsc.py --rg run, so this file may never get created.
+    path "cohort.rg.log",           emit: log, optional: true
+    path "versions.yml",            emit: versions
+
+    script:
+    def sumstats_arg = sumstats instanceof List ? sumstats.join(',') : sumstats
+    def ids_arg       = ids.join(',')
+    """
+    ldsc_rg.R \\
+        --sumstats ${sumstats_arg} \\
+        --ids ${ids_arg} \\
+        --ld_dir ld_ref \\
+        --out_summary cohort.rg_all_pairs.tsv
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        r-base: \$(Rscript -e 'cat(strsplit(R.version.string, " ")[[1]][3])')
+    END_VERSIONS
+    """
+}

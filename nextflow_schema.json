@@ -208,6 +208,67 @@
                 }
             }
         },
+        "coloc_options": {
+            "title": "COLOC options",
+            "type": "object",
+            "fa_icon": "fas fa-link",
+            "description": "Bayesian colocalization (coloc.abf) of each GWAS trait against a reference dataset at user-defined loci. Active when 'coloc' is in --modules.",
+            "properties": {
+                "coloc_loci": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "CSV of loci to test (columns: chr, start, end). Can point to the same file as --loci used by SuSiE."
+                },
+                "coloc_ref": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Reference sumstats in hub format (rsid chr pos ea oa beta se n) — the trait 2 dataset (second GWAS, eQTL, or pQTL)."
+                },
+                "coloc_ref_type": {
+                    "type": "string",
+                    "enum": ["quant", "cc"],
+                    "description": "Dataset type for the reference (trait 2): 'quant' for quantitative, 'cc' for case-control."
+                },
+                "coloc_trait1_type": {
+                    "type": "string",
+                    "enum": ["quant", "cc"],
+                    "default": "quant",
+                    "description": "Dataset type for the GWAS trait (trait 1): 'quant' for quantitative, 'cc' for case-control."
+                },
+                "coloc_n2": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Sample-size fallback for trait 2 when the reference file lacks an 'n' column."
+                },
+                "coloc_s2": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Proportion of cases in the trait 2 case-control dataset (required when --coloc_ref_type cc)."
+                },
+                "coloc_p1": {
+                    "type": "number",
+                    "default": 1e-4,
+                    "description": "Prior probability that a SNP is associated with trait 1 only."
+                },
+                "coloc_p2": {
+                    "type": "number",
+                    "default": 1e-4,
+                    "description": "Prior probability that a SNP is associated with trait 2 only."
+                },
+                "coloc_p12": {
+                    "type": "number",
+                    "default": 1e-5,
+                    "description": "Prior probability that a SNP is associated with both traits (shared causal variant)."
+                },
+                "coloc_min_snps": {
+                    "type": "integer",
+                    "default": 50,
+                    "minimum": 1,
+                    "description": "Minimum overlapping SNPs required per locus; loci with fewer SNPs after harmonisation are skipped with a note."
+                }
+            }
+        },
         "institutional_config_options": {
             "title": "Institutional config options",
             "type": "object",
@@ -334,6 +395,9 @@
         },
         {
             "$ref": "#/$defs/magma_options"
+        },
+        {
+            "$ref": "#/$defs/coloc_options"
         },
         {
             "$ref": "#/$defs/institutional_config_options"

@@ -8,6 +8,8 @@ include { HARMONISE         } from '../subworkflows/local/harmonise'
 include { SBAYESRC          } from '../subworkflows/local/sbayesrc'
 include { SUSIE_FINEMAP     } from '../subworkflows/local/susie'
 include { MAGMA             } from '../subworkflows/local/magma'
+include { COLOC_ANALYSIS    } from '../subworkflows/local/coloc'
+include { LDSC              } from '../subworkflows/local/ldsc'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -67,6 +69,45 @@ workflow SUMSTATS {
         ch_versions      = ch_versions.mix(MAGMA.out.versions)
     }
 
+    ch_coloc_summary = Channel.empty()
+    ch_coloc_snp_pp  = Channel.empty()
+    if ('coloc' in mods) {
+        if (!params.coloc_loci || !params.coloc_ref_type) {
+            error "COLOC: --coloc_loci and --coloc_ref_type (quant|cc) are required for the 'coloc' module"
+        }
+        if (!params.coloc_ref && !params.coloc_ref_dir) {
+            error "COLOC: provide --coloc_ref (eQTL file) or --coloc_ref_dir (pre-filtered gene dir)"
+        }
+        if ((params.coloc_genes || params.coloc_auto_genes) && !params.coloc_ref) {
+            error "COLOC: --coloc_genes / --coloc_auto_genes require --coloc_ref (full eQTL file)"
+        }
+        if (params.coloc_genes && params.coloc_auto_genes) {
+            error "COLOC: --coloc_genes and --coloc_auto_genes are mutually exclusive"
+        }
+        def coloc_loci_ch    = file(params.coloc_loci, checkIfExists: true)
+        def coloc_ref_ch     = params.coloc_ref     ? file(params.coloc_ref,     checkIfExists: true) : null
+        def coloc_ref_dir_ch = params.coloc_ref_dir ? file(params.coloc_ref_dir, checkIfExists: true) : null
+        def coloc_genes_ch   = params.coloc_genes   ? file(params.coloc_genes,   checkIfExists: true) : null
+        COLOC_ANALYSIS(HARMONISE.out.harmonised, coloc_ref_ch, coloc_ref_dir_ch, coloc_genes_ch, coloc_loci_ch)
+        ch_coloc_summary = COLOC_ANALYSIS.out.summary
+        ch_coloc_snp_pp  = COLOC_ANALYSIS.out.snp_pp
+        ch_versions      = ch_versions.mix(COLOC_ANALYSIS.out.versions)
+    }
+
+    ch_ldsc_h2 = Channel.empty()
+    ch_ldsc_rg = Channel.empty()
+    if ('ldsc' in mods) {
+        if (!params.ldsc_ld_dir || !params.ldsc_snplist) {
+            error "LDSC: --ldsc_ld_dir and --ldsc_snplist are required for the 'ldsc' module"
+        }
+        LDSC(HARMONISE.out.harmonised,
+             file(params.ldsc_ld_dir, checkIfExists: true),
+             file(params.ldsc_snplist, checkIfExists: true))
+        ch_ldsc_h2  = LDSC.out.h2
+        ch_ldsc_rg  = LDSC.out.rg
+        ch_versions = ch_versions.mix(LDSC.out.versions)
+    }
+
     emit:
     harmonised     = HARMONISE.out.harmonised
     sbayesrc       = ch_sbayesrc
@@ -74,5 +115,9 @@ workflow SUMSTATS {
     magma_genes    = ch_magma_genes
     magma_geneset  = ch_magma_geneset
     magma_tissue   = ch_magma_tissue
+    coloc_summary  = ch_coloc_summary
+    coloc_snp_pp   = ch_coloc_snp_pp
+    ldsc_h2        = ch_ldsc_h2
+    ldsc_rg        = ch_ldsc_rg
     versions       = ch_versions
 }

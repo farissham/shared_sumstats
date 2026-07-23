@@ -18,7 +18,7 @@ workflow HARMONISE {
     main:
     ch_versions = Channel.empty()
 
-    def supported   = ['gwas-ssf', 'gwama', 'hail', 'cvdkp']
+    def supported   = ['gwas-ssf', 'gwama', 'hail', 'hail_step3', 'cvdkp']
     def panel_build = params.ld_ref_build
     def chains      = params.liftover_chains ?: [:]
 
