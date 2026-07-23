@@ -1,4 +1,4 @@
-# bernooi/shared_sumstats
+# farissham/shared_sumstats
 
 Shared, multi-contributor Nextflow / nf-core-style pipeline for descriptive
 analysis of GWAS summary statistics. Ported from `bernooi/sumstats`.
