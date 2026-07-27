@@ -10,7 +10,8 @@
 FROM ubuntu:22.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends wget unzip ca-certificates && \
-    wget -q "https://vu.data.surfsara.nl/index.php/s/lxDgt2dNdNr6DYt/download" -O /tmp/magma.zip && \
+    wget -4 --tries=5 --waitretry=10 --timeout=30 -q \
+        "https://vu.data.surfsara.nl/index.php/s/lxDgt2dNdNr6DYt/download" -O /tmp/magma.zip && \
     unzip -q /tmp/magma.zip -d /opt/magma && \
     chmod +x /opt/magma/magma && \
     rm /tmp/magma.zip && \
