@@ -207,6 +207,12 @@ if (nrow(by_pos)) {
                      build, opt$panel_build, opt$panel_build))
     }
     n_pos <- nrow(by_pos)
+    # CHR type can disagree between sides (e.g. a genome-wide input with sex
+    # chromosomes -> tstrsplit keeps its CHR character, vs an autosome-only
+    # reference panel -> fread auto-detects integer) - data.table refuses to
+    # join mismatched types outright. Force both to character so a real X/Y
+    # chromosome value never gets silently coerced to NA on either side.
+    rmap[, CHR := as.character(CHR)]; by_pos[, CHR := as.character(CHR)]
     setkey(rmap, CHR, POS); setkey(by_pos, CHR, POS)
     by_pos <- rmap[by_pos, nomatch = NULL]
     rate <- if (n_pos > 0) nrow(by_pos) / n_pos else 0
