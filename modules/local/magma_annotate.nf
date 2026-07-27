@@ -2,7 +2,7 @@ process MAGMA_ANNOTATE {
     tag "magma_annotate"
     label 'process_low'
     conda "bioconda::magma=1.10"
-    container 'quay.io/biocontainers/magma:1.10--h9f5acd7_0'
+    container 'ghcr.io/farissham/magma:1.10'
 
     input:
     path bim      // PLINK .bim from reference panel (SNP positions)

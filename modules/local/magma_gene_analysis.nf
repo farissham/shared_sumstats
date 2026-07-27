@@ -2,7 +2,7 @@ process MAGMA_GENE_ANALYSIS {
     tag "$meta.id"
     label 'process_medium'
     conda "bioconda::magma=1.10"
-    container 'quay.io/biocontainers/magma:1.10--h9f5acd7_0'
+    container 'ghcr.io/farissham/magma:1.10'
 
     input:
     tuple val(meta), path(hub), path(genes_annot)
