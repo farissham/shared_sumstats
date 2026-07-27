@@ -2,8 +2,8 @@ process COLOC {
     tag "${meta.id}:${gene_id}:chr${chr}:${start}-${end}"
     label 'process_low'
 
-    conda "bioconda::r-coloc=5.2.3 conda-forge::r-optparse"
-    container 'quay.io/biocontainers/r-coloc:5.2.3--r44h3121a25_0'
+    conda "bioconda::r-coloc=5.1.0.1 conda-forge::r-optparse"
+    container 'quay.io/biocontainers/r-coloc:5.1.0.1--r42h3121a25_1'
 
     input:
     tuple val(meta), val(gene_id), path(hub), val(chr), val(start), val(end), path(ref)
