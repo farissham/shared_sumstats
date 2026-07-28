@@ -1,0 +1,38 @@
+name: Build coloc container
+
+on:
+  push:
+    branches: [main, feat/**]
+    paths:
+      - 'docker/coloc/Dockerfile'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE:    ghcr.io/${{ github.repository_owner }}/coloc
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: docker/coloc
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:5.2.3
+            ${{ env.IMAGE }}:latest

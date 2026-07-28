@@ -2,8 +2,11 @@ process DISCOVER_GENES_IN_LOCUS {
     tag "${meta.id}:chr${chr}:${start}-${end}"
     label 'process_low'
 
-    conda "bioconda::r-coloc=5.1.0.1 conda-forge::r-optparse"
-    container 'quay.io/biocontainers/r-coloc:5.1.0.1--r42h3121a25_1'
+    // No reliable bioconda build for coloc>5.1.0.1 with optparse/data.table
+    // bundled together (see docker/coloc/Dockerfile). Run via conda
+    // (-profile conda) or the custom image below.
+    conda "conda-forge::r-optparse conda-forge::r-data.table bioconda::r-coloc=5.1.0.1"
+    container 'ghcr.io/farissham/coloc:5.2.3'
 
     input:
     tuple val(meta), val(chr), val(start), val(end), path(eqtl)
