@@ -39,6 +39,7 @@ process COLOC {
         --ref_ea_col  ${params.coloc_ref_ea_col} \\
         --ref_oa_col  ${params.coloc_ref_oa_col} \\
         --ref_n_col   ${params.coloc_ref_n_col} \\
+        --ref_eaf_col ${params.coloc_ref_eaf_col} \\
         --p1          ${params.coloc_p1} \\
         --p2          ${params.coloc_p2} \\
         --p12         ${params.coloc_p12} \\

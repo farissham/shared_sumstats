@@ -32,19 +32,29 @@ process FILTER_EQTL_GENE {
         END_VERSIONS
         """
     else
-        // GTEx-style: prefix match on gene_id column + parse variant_id
+        // GTEx-style: prefix match on gene_id column + parse variant_id.
         // variant_id: chr7_128830322_G_A_b38  →  chr=7 pos=.. oa=G ea=A
+        // All source columns (variant_id/slope/slope_se/maf) are resolved by
+        // header name, not hardcoded position - GTEx's real allpairs.txt.gz
+        // layout is gene_id,variant_id,tss_distance,ma_samples,ma_count,maf,
+        // pval_nominal,slope,slope_se (gene_id first, NOT variant_id first).
         """
         ${zcat_cmd} ${eqtl} | awk -F'\\t' -v OFS='\\t' -v gene="${gene}" -v col="${gene_col}" '
             NR==1 {
-                for(i=1;i<=NF;i++) if(\$i==col) gc=i
+                for(i=1;i<=NF;i++) {
+                    if(\$i==col)          gc=i
+                    if(\$i=="variant_id") vc=i
+                    if(\$i=="slope")      bc=i
+                    if(\$i=="slope_se")   sc=i
+                    if(\$i=="maf")        fc=i
+                }
                 print "variant_id","chr","pos","ea","oa","beta","se","maf","gene_id"
                 next
             }
             \$gc ~ gene {
-                split(\$1, v, "_")
+                split(\$vc, v, "_")
                 gsub("chr","",v[1])
-                print \$1, v[1]+0, v[2]+0, v[4], v[3], \$8, \$9, \$6, \$2
+                print \$vc, v[1]+0, v[2]+0, v[4], v[3], \$bc, \$sc, \$fc, \$gc
             }' > ${gene}.eqtl.txt
 
         cat <<-END_VERSIONS > versions.yml
