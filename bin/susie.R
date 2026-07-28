@@ -151,6 +151,7 @@ if (!is.null(cs)) {
     cs$pos  <- sapply(cs$variable, annotate, col = kept$pos)
     cs$z    <- sapply(cs$variable, annotate, col = kept$z_aln)
     cs$p    <- sapply(cs$variable, annotate, col = kept$p)
+    cs$pip  <- sapply(cs$variable, annotate, col = result$pip)
     fwrite(cs, opt$out_cs)
     cat("[susie] credible sets ->", opt$out_cs, "\n")
 } else {
