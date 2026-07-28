@@ -159,6 +159,6 @@ if (!is.null(cs)) {
 }
 
 png(opt$out_plot, width = 1200, height = 600, res = 150)
-susie_plot(result, y = "PIP", main = sprintf("chr%d:%d-%d", opt$chr, opt$start, opt$end))
+susie_plot(result, y = "PIP", main = sprintf("chr%d:%d-%d", opt$chr, opt$start, opt$end), ylim = c(0, 1))
 dev.off()
 cat("[susie] PIP plot ->", opt$out_plot, "\n")
