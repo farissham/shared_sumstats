@@ -4,6 +4,8 @@ process MAGMA_TISSUE {
     conda "bioconda::magma=1.10"
     container 'ghcr.io/farissham/magma:1.10'
 
+    publishDir "${params.outdir}/magma", mode: params.publish_dir_mode
+
     input:
     tuple val(meta), path(genes_raw)
     path gtex

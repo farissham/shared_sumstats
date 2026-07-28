@@ -4,6 +4,8 @@ process MAGMA_ANNOTATE {
     conda "bioconda::magma=1.10"
     container 'ghcr.io/farissham/magma:1.10'
 
+    publishDir "${params.outdir}/magma", mode: params.publish_dir_mode
+
     input:
     path bim      // PLINK .bim from reference panel (SNP positions)
     path gene_loc // NCBI gene location file (ENTREZ_ID CHR START STOP STRAND SYMBOL)
