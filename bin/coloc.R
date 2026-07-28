@@ -223,13 +223,26 @@ if (!is.finite(n2) || n2 <= 0) {
 ## ---- coloc dataset objects --------------------------------------------------
 snp_ids <- if ("rsid" %in% names(m)) m$rsid else m$chrpos
 
+## eaf.1/eaf.2 only exist if BOTH hub and ref have an "eaf" column (merge()
+## only suffixes colliding names). If only one side has it - e.g. eQTLGen's
+## ref never has an eaf-equivalent column at all - it survives the merge
+## unsuffixed as plain "eaf", which "eaf.1"/"eaf.2" would never match. Same
+## ambiguity already handled correctly for n.1/n above; apply the same
+## fallback here instead of silently losing MAF (and therefore coloc.abf()'s
+## only way to estimate sdY for type="quant") whenever no collision occurs.
+## Resolved against the pre-merge hub/ref tables (still in scope), not
+## guessed from the merged name alone, since an unsuffixed "eaf" in m could
+## belong to either side depending on which one actually had the column.
+eaf1_col <- if ("eaf.1" %in% names(m)) "eaf.1" else if ("eaf" %in% names(hub)) "eaf" else NA_character_
+eaf2_col <- if ("eaf.2" %in% names(m)) "eaf.2" else if ("eaf" %in% names(ref)) "eaf" else NA_character_
+
 ds1 <- list(snp     = snp_ids,
             beta    = as.numeric(m$beta.1),
             varbeta = as.numeric(m$se.1)^2,
             type    = opt$type1,
             N       = n1)
-if ("eaf.1" %in% names(m) && !all(is.na(m$eaf.1)))
-    ds1$MAF <- pmin(as.numeric(m$eaf.1), 1 - as.numeric(m$eaf.1))
+if (!is.na(eaf1_col) && !all(is.na(m[[eaf1_col]])))
+    ds1$MAF <- pmin(as.numeric(m[[eaf1_col]]), 1 - as.numeric(m[[eaf1_col]]))
 if (opt$type1 == "cc" && !is.na(opt$s1)) ds1$s <- opt$s1
 
 ds2 <- list(snp     = snp_ids,
@@ -237,8 +250,8 @@ ds2 <- list(snp     = snp_ids,
             varbeta = as.numeric(m$se.2)^2,
             type    = opt$type2,
             N       = n2)
-if ("eaf.2" %in% names(m) && !all(is.na(m$eaf.2)))
-    ds2$MAF <- pmin(as.numeric(m$eaf.2), 1 - as.numeric(m$eaf.2))
+if (!is.na(eaf2_col) && !all(is.na(m[[eaf2_col]])))
+    ds2$MAF <- pmin(as.numeric(m[[eaf2_col]]), 1 - as.numeric(m[[eaf2_col]]))
 if (opt$type2 == "cc" && !is.na(opt$s2)) ds2$s <- opt$s2
 # eQTLGen uses inverse-normal transformed expression → sdY = 1 exactly.
 # coloc.abf() requires sdY (or MAF+N) for type="quant"; set it when z-score
