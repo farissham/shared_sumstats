@@ -158,11 +158,30 @@ parse_cvdkp <- function(d) {
                p = 10 ^ as.numeric(d[[c_lp]]), n_row = n_row)
 }
 
+parse_cc_mtag <- function(d) {
+    # Kramarenko et al. 2025 case-case MTAG (DCM vs HCM), GRCh38, MYBPC3-region
+    # excluded. rsID is already a first-class column - used directly as marker,
+    # no chr:pos build-matching needed. Neff (not the unlabelled `_samples`
+    # column) is the intended per-SNP sample size: the paper's own methods use
+    # "effective sample size" as their stated QC filtering metric (e.g. "retained
+    # variants with >=70% effective sample size"), and `_samples` is an
+    # unexplained, oddly-named column with no support in the text.
+    # A1 = effect allele: not stated explicitly in the preprint, but empirically
+    # supported - both this file and our own hub independently use "C" as the
+    # effect allele for rs2234962 (BAG3), with the same negative beta sign.
+    need(d, c("rsID", "A1", "A2", "EAFREQ", "BETA", "SE", "Neff", "P"))
+    data.table(marker = as.character(d$rsID), ea_in = d$A1, oa_in = d$A2,
+               eaf_in = suppressWarnings(as.numeric(d$EAFREQ)),
+               beta = as.numeric(d$BETA), se = as.numeric(d$SE),
+               p = as.numeric(d$P), n_row = as.numeric(d$Neff))
+}
+
 dt <- read_any(opt$input)
 s  <- switch(opt$format,
     "gwas-ssf" = parse_gwas_ssf(dt),   "gwama" = parse_gwama(dt),
     "hail"     = parse_hail(dt),       "cvdkp" = parse_cvdkp(dt),
     "hail_step3" = parse_hail_step3(dt),
+    "cc_mtag"    = parse_cc_mtag(dt),
     stop("Unknown --format: ", opt$format))
 
 # read panel up front: used by both the build matcher and the final rsID join
