@@ -41,10 +41,17 @@ awk 'BEGIN{OFS="\t"} { sub("^chr","",$1); print $4, $1, $3 }' "$WORKDIR/snps.hg3
 
 # Rebuild .bim row-for-row (preserves .bed/.fam sync): lifted rows get their
 # new chr/pos, unlifted rows get the chr=0 sentinel and go on the exclude list.
+# liftOver can legitimately map a GRCh37 position onto a GRCh38 alt-contig/
+# patch scaffold (e.g. "1_KI270766v1_alt") that has no GRCh37 equivalent -
+# none of this pipeline's other reference data (LD reference, hub) uses
+# anything but standard autosomes 1-22, so treat a non-1-22 chromosome code
+# the same as a failed lift rather than passing it through to PLINK2 (which
+# rejects it outright anyway without --allow-extra-chr).
 awk 'BEGIN{OFS="\t"; while((getline l < "'"$WORKDIR"'/lifted.map") > 0) {
         split(l, a, "\t"); newchr[a[1]]=a[2]; newpos[a[1]]=a[3]
     } }
-    { if (NR in newchr) { $1=newchr[NR]; $4=newpos[NR]; print }
+    { ok = (NR in newchr) && (newchr[NR] ~ /^([1-9]|1[0-9]|2[0-2])$/)
+      if (ok) { $1=newchr[NR]; $4=newpos[NR]; print }
       else { print $2 > "'"$WORKDIR"'/exclude.txt"; $1=0; $4=0; print } }' \
     "${BFILE}.bim" > "$WORKDIR/lifted.bim"
 
