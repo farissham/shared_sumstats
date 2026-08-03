@@ -17,8 +17,14 @@ process LDSC_H2 {
     script:
     // Both prevalences come from the samplesheet (per-trait: different cohort subsets
     // of the same disease can have very different case fractions in their own GWAS).
-    def samp_prev_arg = meta.samp_prev != null ? "--samp_prev ${meta.samp_prev}" : ''
-    def pop_prev_arg  = meta.pop_prev  != null ? "--pop_prev ${meta.pop_prev}"   : ''
+    // A blank samplesheet cell for a non-nullable "number"-typed optional schema
+    // field surfaces here as [] (empty list), not null, depending on the
+    // nf-schema samplesheet-to-channel conversion - `!= null` alone doesn't catch
+    // that, and interpolating an empty list gives the literal string "[]" on the
+    // CLI, which ldsc.py then fails to parse as a float. Require an actual Number
+    // instead, regardless of what shape "absent" takes.
+    def samp_prev_arg = (meta.samp_prev instanceof Number) ? "--samp_prev ${meta.samp_prev}" : ''
+    def pop_prev_arg  = (meta.pop_prev  instanceof Number) ? "--pop_prev ${meta.pop_prev}"   : ''
     """
     ldsc_h2.R \\
         --sumstats ${sumstats} \\
