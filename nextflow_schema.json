@@ -10,7 +10,10 @@
             "type": "object",
             "fa_icon": "fas fa-terminal",
             "description": "Define where the pipeline should find input data and save output data.",
-            "required": ["input", "outdir"],
+            "required": [
+                "input",
+                "outdir"
+            ],
             "properties": {
                 "input": {
                     "type": "string",
@@ -46,19 +49,28 @@
             "properties": {
                 "snp_set": {
                     "type": "string",
-                    "enum": ["hm3", "imputed_7m"],
+                    "enum": [
+                        "hm3",
+                        "imputed_7m"
+                    ],
                     "default": "hm3",
                     "description": "SNP set / LD reference panel to use."
                 },
                 "genome_build": {
                     "type": "string",
-                    "enum": ["GRCh37", "GRCh38"],
+                    "enum": [
+                        "GRCh37",
+                        "GRCh38"
+                    ],
                     "default": "GRCh37",
                     "description": "Genome build recorded in meta.build when a samplesheet row omits it (record-only; no liftover)."
                 },
                 "ld_ref_build": {
                     "type": "string",
-                    "enum": ["GRCh37", "GRCh38"],
+                    "enum": [
+                        "GRCh37",
+                        "GRCh38"
+                    ],
                     "default": "GRCh37",
                     "description": "Genome build of the LD reference snp.info; the gwama build matcher derives a chr:pos->rsID map directly from snp.info for inputs on this build."
                 },
@@ -83,7 +95,10 @@
                 },
                 "ld_mode": {
                     "type": "string",
-                    "enum": ["prebuilt", "build"],
+                    "enum": [
+                        "prebuilt",
+                        "build"
+                    ],
                     "default": "prebuilt",
                     "description": "LD-reference resolution mode: 'prebuilt' uses a pre-staged ld_ref_dir (or downloads ld_ref_url); 'build' constructs eigen-LD + snp.info from a genotype panel via SBayesRC::LDstep."
                 },
@@ -222,16 +237,22 @@
                 "coloc_ref": {
                     "type": "string",
                     "format": "file-path",
-                    "description": "Reference sumstats in hub format (rsid chr pos ea oa beta se n) — the trait 2 dataset (second GWAS, eQTL, or pQTL)."
+                    "description": "Reference sumstats in hub format (rsid chr pos ea oa beta se n) \u2014 the trait 2 dataset (second GWAS, eQTL, or pQTL)."
                 },
                 "coloc_ref_type": {
                     "type": "string",
-                    "enum": ["quant", "cc"],
+                    "enum": [
+                        "quant",
+                        "cc"
+                    ],
                     "description": "Dataset type for the reference (trait 2): 'quant' for quantitative, 'cc' for case-control."
                 },
                 "coloc_trait1_type": {
                     "type": "string",
-                    "enum": ["quant", "cc"],
+                    "enum": [
+                        "quant",
+                        "cc"
+                    ],
                     "default": "quant",
                     "description": "Dataset type for the GWAS trait (trait 1): 'quant' for quantitative, 'cc' for case-control."
                 },
@@ -248,17 +269,17 @@
                 },
                 "coloc_p1": {
                     "type": "number",
-                    "default": 1e-4,
+                    "default": 0.0001,
                     "description": "Prior probability that a SNP is associated with trait 1 only."
                 },
                 "coloc_p2": {
                     "type": "number",
-                    "default": 1e-4,
+                    "default": 0.0001,
                     "description": "Prior probability that a SNP is associated with trait 2 only."
                 },
                 "coloc_p12": {
                     "type": "number",
-                    "default": 1e-5,
+                    "default": 1e-05,
                     "description": "Prior probability that a SNP is associated with both traits (shared causal variant)."
                 },
                 "coloc_min_snps": {
@@ -336,7 +357,14 @@
                     "description": "Method used to save pipeline results to output directory.",
                     "help_text": "The Nextflow `publishDir` option specifies which intermediate files should be saved to the output directory. This option tells the pipeline what method should be used to move these files. See [Nextflow docs](https://www.nextflow.io/docs/latest/process.html#publishdir) for details.",
                     "fa_icon": "fas fa-copy",
-                    "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"],
+                    "enum": [
+                        "symlink",
+                        "rellink",
+                        "link",
+                        "copy",
+                        "copyNoFollow",
+                        "move"
+                    ],
                     "hidden": true
                 },
                 "monochrome_logs": {
@@ -366,7 +394,10 @@
                     "hidden": true
                 },
                 "help": {
-                    "type": ["boolean", "string"],
+                    "type": [
+                        "boolean",
+                        "string"
+                    ],
                     "description": "Display the help message."
                 },
                 "help_full": {
@@ -376,6 +407,19 @@
                 "show_hidden": {
                     "type": "boolean",
                     "description": "Display hidden parameters in the help message (only works when --help or --help_full are provided)."
+                }
+            }
+        },
+        "concordance_options": {
+            "title": "Concordance analysis options",
+            "type": "object",
+            "fa_icon": "fas fa-not-equal",
+            "description": "Pairwise effect-direction concordance across all traits' harmonised hubs (belowlab/Concordance-Analysis). Needs >=2 traits in the samplesheet; skipped/no-op otherwise.",
+            "properties": {
+                "concordance_pval_thresh": {
+                    "type": "number",
+                    "default": 0.005,
+                    "description": "P-value threshold defining a contiguous LD block for the concordance test (published default: 0.005)."
                 }
             }
         }
@@ -389,6 +433,9 @@
         },
         {
             "$ref": "#/$defs/ldsc_options"
+        },
+        {
+            "$ref": "#/$defs/concordance_options"
         },
         {
             "$ref": "#/$defs/susie_options"

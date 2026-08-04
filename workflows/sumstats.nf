@@ -10,6 +10,7 @@ include { SUSIE_FINEMAP     } from '../subworkflows/local/susie'
 include { MAGMA             } from '../subworkflows/local/magma'
 include { COLOC_ANALYSIS    } from '../subworkflows/local/coloc'
 include { LDSC              } from '../subworkflows/local/ldsc'
+include { CONCORDANCE       } from '../subworkflows/local/concordance'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -108,6 +109,13 @@ workflow SUMSTATS {
         ch_versions = ch_versions.mix(LDSC.out.versions)
     }
 
+    ch_concordance = Channel.empty()
+    if ('concordance' in mods) {
+        CONCORDANCE(HARMONISE.out.harmonised)
+        ch_concordance = CONCORDANCE.out.summary
+        ch_versions    = ch_versions.mix(CONCORDANCE.out.versions)
+    }
+
     emit:
     harmonised     = HARMONISE.out.harmonised
     sbayesrc       = ch_sbayesrc
@@ -119,5 +127,6 @@ workflow SUMSTATS {
     coloc_snp_pp   = ch_coloc_snp_pp
     ldsc_h2        = ch_ldsc_h2
     ldsc_rg        = ch_ldsc_rg
+    concordance    = ch_concordance
     versions       = ch_versions
 }
